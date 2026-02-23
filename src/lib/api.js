@@ -17,7 +17,24 @@ async function apiRequest(endpoint, options = {}) {
     config.body = JSON.stringify(options.body)
   }
 
-  const response = await fetch(url, config)
+  let response
+  let lastError = null
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      response = await fetch(url, config)
+      break
+    } catch (error) {
+      lastError = error
+      const isNetworkError = error instanceof TypeError
+      if (!isNetworkError || attempt === 2) {
+        throw error
+      }
+      await new Promise(resolve => setTimeout(resolve, 1200 * (attempt + 1)))
+    }
+  }
+
+  if (!response && lastError) throw lastError
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Request failed' }))
