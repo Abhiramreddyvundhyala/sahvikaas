@@ -59,7 +59,7 @@ export default function CreateRoomPage() {
   }
 
   const basePath = import.meta.env.BASE_URL?.replace(/\/$/, '') || ''
-  const roomUrl = `${window.location.origin}${basePath}/room/${createdRoomId}`
+  const roomUrl = `${window.location.origin}${basePath}/#/room/${createdRoomId}`
 
   const copyUrl = () => {
     navigator.clipboard.writeText(roomUrl)
