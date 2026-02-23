@@ -1,5 +1,5 @@
-// API base URL: prefer env in all modes, fallback to proxy in dev
-const API_BASE = import.meta.env.VITE_API_URL?.trim() || (import.meta.env.PROD ? 'http://localhost:5000' : '')
+// API base URL (hardcoded backend)
+const API_BASE = 'https://sahvikaas.onrender.com'
 
 async function apiRequest(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`
