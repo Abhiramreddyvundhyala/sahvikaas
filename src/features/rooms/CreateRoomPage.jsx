@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Modal from '../../components/ui/Modal'
 import { useAuth } from '../../lib/auth'
+import { createMeeting } from '../../lib/api'
 
 export default function CreateRoomPage() {
   const navigate = useNavigate()
-  const { user, createRoom } = useAuth()
+  const { user } = useAuth()
   const [formData, setFormData] = useState({
     name: '',
     subject: '',
@@ -32,15 +33,16 @@ export default function CreateRoomPage() {
     setInvitedMembers(prev => prev.filter(e => e !== email))
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.name.trim() || !formData.subject.trim()) {
       setErrorModal({ open: true, message: 'Please fill in all required fields.' })
       return
     }
     setLoading(true)
-    setTimeout(() => {
-      const result = createRoom({
+    try {
+      const result = await createMeeting({
+        userName: user?.name || 'Host',
         name: formData.name,
         subject: formData.subject,
         privacy: formData.privacy,
@@ -48,16 +50,16 @@ export default function CreateRoomPage() {
         video: formData.video,
       })
       setLoading(false)
-      if (!result.ok) {
-        setErrorModal({ open: true, message: result.error })
-        return
-      }
-      setCreatedRoomId(result.room.id)
+      setCreatedRoomId(result.meetingId)
       setSuccessModal(true)
-    }, 800)
+    } catch (error) {
+      setLoading(false)
+      setErrorModal({ open: true, message: error.message || 'Failed to create room.' })
+    }
   }
 
-  const roomUrl = `${window.location.origin}/room/${createdRoomId}`
+  const basePath = import.meta.env.BASE_URL?.replace(/\/$/, '') || ''
+  const roomUrl = `${window.location.origin}${basePath}/room/${createdRoomId}`
 
   const copyUrl = () => {
     navigator.clipboard.writeText(roomUrl)

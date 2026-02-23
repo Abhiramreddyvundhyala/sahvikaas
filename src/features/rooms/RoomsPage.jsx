@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Modal from '../../components/ui/Modal'
-import { useAuth } from '../../lib/auth'
+import { listMeetings } from '../../lib/api'
 
 const categories = ['All Rooms', 'Computer Science', 'Mathematics', 'Physics']
 
@@ -21,26 +21,49 @@ const upcomingRooms = [
 
 export default function RoomsPage() {
   const navigate = useNavigate()
-  const { getAllRooms, user } = useAuth()
   const [activeCategory, setActiveCategory] = useState('All Rooms')
   const [joinModalOpen, setJoinModalOpen] = useState(false)
   const [joinUrl, setJoinUrl] = useState('')
+  const [sharedRooms, setSharedRooms] = useState([])
+  const [roomsLoading, setRoomsLoading] = useState(true)
 
-  // Merge sample rooms with user-created rooms from local store
-  const userRooms = getAllRooms().map(r => ({
-    id: r.id,
-    name: r.name,
-    description: r.subject,
-    status: 'Active',
-    participants: 0,
-    max: 12,
-    time: 'Created ' + new Date(r.createdAt).toLocaleDateString(),
-    host: r.creatorName,
-    category: r.subject,
-    isUserRoom: true,
-  }))
+  useEffect(() => {
+    let mounted = true
+    const loadRooms = async () => {
+      setRoomsLoading(true)
+      try {
+        const data = await listMeetings()
+        if (!mounted) return
+        const mapped = (data.rooms || []).map(r => ({
+          id: r.id,
+          name: r.name,
+          description: r.subject,
+          status: 'Active',
+          participants: r.participantCount || 0,
+          max: 12,
+          time: 'Created ' + new Date(r.createdAt).toLocaleDateString(),
+          host: r.createdBy,
+          category: r.subject,
+          isUserRoom: true,
+        }))
+        setSharedRooms(mapped)
+      } catch {
+        if (!mounted) return
+        setSharedRooms([])
+      } finally {
+        if (mounted) setRoomsLoading(false)
+      }
+    }
 
-  const allRooms = [...userRooms, ...roomsData]
+    loadRooms()
+    const interval = setInterval(loadRooms, 10000)
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
+  }, [])
+
+  const allRooms = [...sharedRooms, ...roomsData]
 
   const filteredRooms = activeCategory === 'All Rooms'
     ? allRooms
@@ -48,7 +71,7 @@ export default function RoomsPage() {
 
   const handleJoinByUrl = () => {
     if (!joinUrl.trim()) return
-    const idMatch = joinUrl.match(/room\/([a-zA-Z0-9]+)/) || joinUrl.match(/id=([a-zA-Z0-9]+)/)
+    const idMatch = joinUrl.match(/room\/([a-zA-Z0-9_-]+)/) || joinUrl.match(/id=([a-zA-Z0-9_-]+)/)
     const roomId = idMatch ? idMatch[1] : joinUrl.trim()
     setJoinModalOpen(false)
     setJoinUrl('')
@@ -118,6 +141,9 @@ export default function RoomsPage() {
       </div>
 
       {/* Active Rooms Grid */}
+      {roomsLoading && (
+        <div className="text-sm text-gray-500">Loading live rooms...</div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
         {filteredRooms.map(room => (
           <div key={room.id} className={`bg-white border rounded-lg shadow-sm p-3 sm:p-5 ${room.isUserRoom ? 'border-indigo-200 ring-1 ring-indigo-100' : 'border-gray-200'}`}>

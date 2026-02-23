@@ -45,11 +45,16 @@ const rooms = new Map()
 //   points: Map<userName, { points, activities: [] }>,
 // }
 
-function getOrCreateRoom(roomId, creatorName = 'Host') {
+function getOrCreateRoom(roomId, creatorName = 'Host', roomMeta = {}) {
   if (!rooms.has(roomId)) {
     rooms.set(roomId, {
       id: roomId,
       createdBy: creatorName,
+      name: roomMeta.name?.trim() || `Study Room ${roomId}`,
+      subject: roomMeta.subject?.trim() || 'General Study',
+      privacy: roomMeta.privacy || 'public',
+      audio: roomMeta.audio ?? true,
+      video: roomMeta.video ?? true,
       createdAt: new Date().toISOString(),
       participants: new Map(),
       chatMessages: [],
@@ -422,10 +427,49 @@ Reply helpfully and concisely (under 200 words). Be friendly and academic.`
 
 // Create a new room/meeting
 app.post('/api/meetings/create', (req, res) => {
-  const { userName = 'Host' } = req.body
+  const {
+    userName = 'Host',
+    name = '',
+    subject = '',
+    privacy = 'public',
+    audio = true,
+    video = true,
+  } = req.body
   const meetingId = uuidv4().slice(0, 8)
-  getOrCreateRoom(meetingId, userName)
-  res.json({ meetingId })
+  const room = getOrCreateRoom(meetingId, userName, { name, subject, privacy, audio, video })
+  res.json({
+    meetingId,
+    room: {
+      id: room.id,
+      name: room.name,
+      subject: room.subject,
+      privacy: room.privacy,
+      audio: room.audio,
+      video: room.video,
+      createdBy: room.createdBy,
+      createdAt: room.createdAt,
+      participantCount: room.participants.size,
+    },
+  })
+})
+
+// Get active rooms list
+app.get('/api/meetings', (req, res) => {
+  const activeRooms = Array.from(rooms.values())
+    .map(room => ({
+      id: room.id,
+      name: room.name,
+      subject: room.subject,
+      privacy: room.privacy,
+      audio: room.audio,
+      video: room.video,
+      createdBy: room.createdBy,
+      createdAt: room.createdAt,
+      participantCount: room.participants.size,
+    }))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+  res.json({ rooms: activeRooms })
 })
 
 // Get room info
@@ -434,6 +478,11 @@ app.get('/api/meetings/:id', (req, res) => {
   if (!room) return res.status(404).json({ error: 'Room not found' })
   res.json({
     id: room.id,
+    name: room.name,
+    subject: room.subject,
+    privacy: room.privacy,
+    audio: room.audio,
+    video: room.video,
     createdBy: room.createdBy,
     participantCount: room.participants.size,
     participants: getParticipantsList(room),
@@ -796,6 +845,7 @@ httpServer.listen(PORT, () => {
   console.log(`   POST /api/ai/enhance-notes   - Notes AI Enhance`)
   console.log(`   POST /api/ai/smart-reply     - Smart Chat Reply`)
   console.log(`   POST /api/meetings/create    - Create Room`)
+  console.log(`   GET  /api/meetings           - List Active Rooms`)
   console.log(`   GET  /api/meetings/:id       - Get Room Info`)
   console.log(`   GET  /api/rooms/:id/state    - Get Room State`)
   console.log(`   GET  /api/health             - Health Check`)

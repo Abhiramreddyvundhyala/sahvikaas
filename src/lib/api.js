@@ -85,3 +85,15 @@ export async function getSmartReply(message, chatHistory = []) {
 export async function healthCheck() {
   return apiRequest('/api/health')
 }
+
+// Rooms / Meetings
+export async function createMeeting(payload) {
+  return apiRequest('/api/meetings/create', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+export async function listMeetings() {
+  return apiRequest('/api/meetings')
+}
