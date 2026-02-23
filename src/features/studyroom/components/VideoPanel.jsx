@@ -36,6 +36,7 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
   const localStreamRef = useRef(null)
   const screenStreamRef = useRef(null)
   const peersRef = useRef(new Map())
+  const pendingIceRef = useRef(new Map())
   const panelRef = useRef(null)
   const socketRef = useRef(null)
   const activeMeetingRef = useRef(null)
@@ -113,6 +114,11 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
 
   // ========== WebRTC Peer Connection ==========
   const createPeerConnection = useCallback((remoteSocketId, remoteName) => {
+    const existingPeer = peersRef.current.get(remoteSocketId)
+    if (existingPeer) {
+      return existingPeer
+    }
+
     const pc = new RTCPeerConnection(ICE_SERVERS)
 
     if (localStreamRef.current) {
@@ -147,6 +153,29 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
     return pc
   }, [])
 
+  const queueIceCandidate = useCallback((remoteSocketId, candidate) => {
+    const queued = pendingIceRef.current.get(remoteSocketId) || []
+    queued.push(candidate)
+    pendingIceRef.current.set(remoteSocketId, queued)
+  }, [])
+
+  const flushQueuedIceCandidates = useCallback(async (remoteSocketId) => {
+    const pc = peersRef.current.get(remoteSocketId)
+    if (!pc || !pc.remoteDescription) return
+
+    const queued = pendingIceRef.current.get(remoteSocketId)
+    if (!queued?.length) return
+
+    for (const candidate of queued) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate))
+      } catch (error) {
+        console.warn('Failed to apply queued ICE candidate:', error)
+      }
+    }
+    pendingIceRef.current.delete(remoteSocketId)
+  }, [])
+
   // ========== Socket listeners ==========
   const setupSocketListeners = useCallback((socket) => {
     // Remove any previous WebRTC listeners to prevent duplicates (critical for React StrictMode)
@@ -178,6 +207,7 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
     socket.on('offer', async ({ from, offer, userName: remoteName }) => {
       const pc = createPeerConnection(from, remoteName)
       await pc.setRemoteDescription(new RTCSessionDescription(offer))
+      await flushQueuedIceCandidates(from)
       const answer = await pc.createAnswer()
       await pc.setLocalDescription(answer)
       socket.emit('answer', { to: from, answer })
@@ -185,14 +215,25 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
 
     socket.on('answer', async ({ from, answer }) => {
       const pc = peersRef.current.get(from)
-      if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer))
+      if (pc) {
+        await pc.setRemoteDescription(new RTCSessionDescription(answer))
+        await flushQueuedIceCandidates(from)
+      }
     })
 
     socket.on('ice-candidate', async ({ from, candidate }) => {
       const pc = peersRef.current.get(from)
+      if (!pc || !pc.remoteDescription) {
+        queueIceCandidate(from, candidate)
+        return
+      }
+
       if (pc) {
         try { await pc.addIceCandidate(new RTCIceCandidate(candidate)) }
-        catch (e) { console.warn('Failed to add ICE candidate:', e) }
+        catch (e) {
+          queueIceCandidate(from, candidate)
+          console.warn('Failed to add ICE candidate:', e)
+        }
       }
     })
 
@@ -210,7 +251,7 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
         return next
       })
     })
-  }, [createPeerConnection])
+  }, [createPeerConnection, flushQueuedIceCandidates, queueIceCandidate])
 
   // ========== Screen share ==========
   const startScreenShare = async () => {
@@ -255,6 +296,7 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
   const cleanup = () => {
     for (const [, pc] of peersRef.current) pc.close()
     peersRef.current.clear()
+    pendingIceRef.current.clear()
     if (localStreamRef.current) { localStreamRef.current.getTracks().forEach(t => t.stop()); localStreamRef.current = null }
     if (screenStreamRef.current) { screenStreamRef.current.getTracks().forEach(t => t.stop()); screenStreamRef.current = null }
     // Clean up WebRTC socket listeners but do NOT disconnect the shared socket
