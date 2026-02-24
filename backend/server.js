@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url'
 import { createServer } from 'http'
 import { Server as SocketServer } from 'socket.io'
 import { v4 as uuidv4 } from 'uuid'
+import * as mediasoupServer from './mediasoup-server.js'
 
 dotenv.config()
 
@@ -681,6 +682,118 @@ io.on('connection', (socket) => {
     socket.to(meetingId).emit('screen-share', { from: socket.id, sharing, userName: socket.userName })
   })
 
+  // ═══════════════════════════════════════════════════════════
+  // MEDIASOUP SFU HANDLERS
+  // ═══════════════════════════════════════════════════════════
+
+  // Get router RTP capabilities
+  socket.on('getRouterRtpCapabilities', async ({ roomId }, callback) => {
+    try {
+      const rtpCapabilities = await mediasoupServer.getRouterRtpCapabilities(roomId)
+      callback({ rtpCapabilities })
+    } catch (error) {
+      console.error('getRouterRtpCapabilities error:', error)
+      callback({ error: error.message })
+    }
+  })
+
+  // Create WebRTC transport
+  socket.on('createWebRtcTransport', async ({ roomId, direction }, callback) => {
+    try {
+      const transport = await mediasoupServer.createWebRtcTransport(roomId, socket.id)
+      callback({ transport })
+    } catch (error) {
+      console.error('createWebRtcTransport error:', error)
+      callback({ error: error.message })
+    }
+  })
+
+  // Connect transport
+  socket.on('connectTransport', async ({ roomId, transportId, dtlsParameters }, callback) => {
+    try {
+      await mediasoupServer.connectTransport(roomId, transportId, dtlsParameters)
+      callback({ success: true })
+    } catch (error) {
+      console.error('connectTransport error:', error)
+      callback({ error: error.message })
+    }
+  })
+
+  // Produce (send media to server)
+  socket.on('produce', async ({ roomId, transportId, kind, rtpParameters, appData }, callback) => {
+    try {
+      const { id } = await mediasoupServer.produce(roomId, socket.id, transportId, kind, rtpParameters, appData)
+      
+      // Notify other peers about new producer
+      socket.to(roomId).emit('newProducer', {
+        producerId: id,
+        peerId: socket.id,
+        kind,
+      })
+      
+      callback({ id })
+    } catch (error) {
+      console.error('produce error:', error)
+      callback({ error: error.message })
+    }
+  })
+
+  // Consume (receive media from server)
+  socket.on('consume', async ({ roomId, transportId, producerId, rtpCapabilities }, callback) => {
+    try {
+      const consumer = await mediasoupServer.consume(roomId, socket.id, transportId, producerId, rtpCapabilities)
+      callback({ consumer })
+    } catch (error) {
+      console.error('consume error:', error)
+      callback({ error: error.message })
+    }
+  })
+
+  // Resume consumer
+  socket.on('resumeConsumer', async ({ roomId, consumerId }, callback) => {
+    try {
+      await mediasoupServer.resumeConsumer(roomId, consumerId)
+      callback({ success: true })
+    } catch (error) {
+      console.error('resumeConsumer error:', error)
+      callback({ error: error.message })
+    }
+  })
+
+  // Pause consumer
+  socket.on('pauseConsumer', async ({ roomId, consumerId }, callback) => {
+    try {
+      await mediasoupServer.pauseConsumer(roomId, consumerId)
+      callback({ success: true })
+    } catch (error) {
+      console.error('pauseConsumer error:', error)
+      callback({ error: error.message })
+    }
+  })
+
+  // Close producer
+  socket.on('closeProducer', async ({ roomId, producerId }, callback) => {
+    try {
+      await mediasoupServer.closeProducer(roomId, producerId)
+      socket.to(roomId).emit('producerClosed', { producerId })
+      callback({ success: true })
+    } catch (error) {
+      console.error('closeProducer error:', error)
+      callback({ error: error.message })
+    }
+  })
+
+  // Get existing producers (when joining)
+  socket.on('getProducers', ({ roomId }, callback) => {
+    try {
+      const producers = mediasoupServer.getProducers(roomId, socket.id)
+      callback({ producers })
+    } catch (error) {
+      console.error('getProducers error:', error)
+      callback({ error: error.message })
+    }
+  })
+
   // ─── REAL-TIME CHAT ─────────────────────────
   socket.on('chat-send', ({ meetingId, content }) => {
     const room = rooms.get(meetingId)
@@ -873,6 +986,13 @@ io.on('connection', (socket) => {
       const room = rooms.get(meetingId)
       room.participants.delete(socket.id)
 
+      // Clean up Mediasoup resources
+      try {
+        mediasoupServer.cleanupPeer(meetingId, socket.id)
+      } catch (error) {
+        console.error('Mediasoup cleanup error:', error)
+      }
+
       socket.to(meetingId).emit('user-left', { id: socket.id })
 
       // Broadcast updated participant list
@@ -906,9 +1026,18 @@ io.on('connection', (socket) => {
 })
 
 // Start server
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, async () => {
   console.log(`\n🚀 StudyHub Backend running on http://localhost:${PORT}`)
-  console.log(`📹 WebRTC Signaling Server active`)
+  
+  // Initialize Mediasoup SFU
+  try {
+    await mediasoupServer.initializeMediasoup()
+    console.log('🎬 Mediasoup SFU ready')
+  } catch (error) {
+    console.error('❌ Failed to initialize Mediasoup:', error)
+  }
+  
+  consolele.log(`📹 WebRTC Signaling Server active`)
   console.log(`� Real-Time Chat active`)
   console.log(`📋 Real-Time Tasks active`)
   console.log(`📝 Real-Time Notes active`)
