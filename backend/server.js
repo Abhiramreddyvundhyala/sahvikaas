@@ -1029,6 +1029,29 @@ io.on('connection', (socket) => {
 httpServer.listen(PORT, async () => {
   console.log(`\n🚀 StudyHub Backend running on http://localhost:${PORT}`)
   
+  // Get and log public IP for Mediasoup configuration
+  try {
+    const https = await import('https')
+    https.get('https://api.ipify.org?format=json', (res) => {
+      let data = ''
+      res.on('data', (chunk) => { data += chunk })
+      res.on('end', () => {
+        try {
+          const ip = JSON.parse(data).ip
+          console.log(`\n📡 Public IP Address: ${ip}`)
+          console.log(`⚙️  Set this in Render environment variables:`)
+          console.log(`   MEDIASOUP_ANNOUNCED_IP=${ip}\n`)
+        } catch (e) {
+          console.log('⚠️  Could not detect public IP')
+        }
+      })
+    }).on('error', () => {
+      console.log('⚠️  Could not detect public IP')
+    })
+  } catch (error) {
+    console.log('⚠️  Could not detect public IP')
+  }
+  
   // Initialize Mediasoup SFU
   try {
     await mediasoupServer.initializeMediasoup()
@@ -1037,8 +1060,8 @@ httpServer.listen(PORT, async () => {
     console.error('❌ Failed to initialize Mediasoup:', error)
   }
   
-  consolele.log(`📹 WebRTC Signaling Server active`)
-  console.log(`� Real-Time Chat active`)
+  console.log(`📹 WebRTC Signaling Server active`)
+  console.log(`💬 Real-Time Chat active`)
   console.log(`📋 Real-Time Tasks active`)
   console.log(`📝 Real-Time Notes active`)
   console.log(`📁 Real-Time Resources active`)
