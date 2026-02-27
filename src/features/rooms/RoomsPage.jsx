@@ -1,55 +1,80 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Modal from '../../components/ui/Modal'
-import { listMeetings } from '../../lib/api'
-
-const categories = ['All Rooms', 'Computer Science', 'Mathematics', 'Physics']
-
-const roomsData = [
-  { id: '1', name: 'Advanced Algorithms', description: 'Graph Theory & Dynamic Programming', status: 'Active', participants: 8, max: 12, time: 'Started 45 min ago', host: 'Dr. Smith', category: 'Computer Science' },
-  { id: '2', name: 'Database Systems', description: 'SQL Optimization & Normalization', status: 'Active', participants: 5, max: 10, time: 'Started 20 min ago', host: 'Prof. Lee', category: 'Computer Science' },
-  { id: '3', name: 'Linear Algebra', description: 'Eigenvalues & Eigenvectors', status: 'Starting Soon', participants: 3, max: 8, time: 'Starts in 15 min', host: 'Dr. Park', category: 'Mathematics' },
-  { id: '4', name: 'Network Security', description: 'Cryptography & Protocols', status: 'Active', participants: 6, max: 10, time: 'Started 1 hr ago', host: 'Prof. Chen', category: 'Computer Science' },
-  { id: '5', name: 'Quantum Physics', description: 'Wave-Particle Duality', status: 'Starting Soon', participants: 2, max: 6, time: 'Starts in 30 min', host: 'Dr. Kumar', category: 'Physics' },
-  { id: '6', name: 'Calculus III', description: 'Multivariable Calculus', status: 'Active', participants: 10, max: 15, time: 'Started 10 min ago', host: 'Prof. Johnson', category: 'Mathematics' },
-]
-
-const upcomingRooms = [
-  { id: '10', name: 'ML Study Group', description: 'Neural Networks Review', date: 'Today, 6:00 PM', participants: 4, host: 'Alice' },
-  { id: '11', name: 'Physics Problem Set', description: 'Mechanics & Thermodynamics', date: 'Tomorrow, 10:00 AM', participants: 7, host: 'Bob' },
-]
+import { getActiveRooms, getUserRoomStats } from '../../lib/roomApiV2'
 
 export default function RoomsPage() {
   const navigate = useNavigate()
-  const [activeCategory, setActiveCategory] = useState('All Rooms')
   const [joinModalOpen, setJoinModalOpen] = useState(false)
   const [joinUrl, setJoinUrl] = useState('')
-  const [sharedRooms, setSharedRooms] = useState([])
+  const [activeRooms, setActiveRooms] = useState([])
+  const [recentSessions, setRecentSessions] = useState([])
+  const [upcomingSessions, setUpcomingSessions] = useState([])
   const [roomsLoading, setRoomsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('active') // active, recent, upcoming
 
   useEffect(() => {
     let mounted = true
     const loadRooms = async () => {
       setRoomsLoading(true)
       try {
-        const data = await listMeetings()
+        const [activeData, statsData] = await Promise.all([
+          getActiveRooms().catch(() => ({ rooms: [] })),
+          getUserRoomStats().catch(() => ({ 
+            activeSessions: [], 
+            recentSessions: [], 
+            upcomingSessions: [] 
+          }))
+        ])
+        
         if (!mounted) return
-        const mapped = (data.rooms || []).map(r => ({
-          id: r.id,
+        
+        // Map active rooms
+        const mappedActive = (activeData.rooms || []).map(r => ({
+          id: r._id,
           name: r.name,
           description: r.subject,
           status: 'Active',
-          participants: r.participantCount || 0,
-          max: 12,
+          participants: r.participants?.length || 0,
           time: 'Created ' + new Date(r.createdAt).toLocaleDateString(),
-          host: r.createdBy,
-          category: r.subject,
-          isUserRoom: true,
+          host: r.createdBy?.name || 'Host',
+          isUserRoom: false,
         }))
-        setSharedRooms(mapped)
-      } catch {
+        
+        // Map recent sessions
+        const mappedRecent = (statsData.recentSessions || []).map(r => ({
+          id: r._id,
+          name: r.name,
+          description: r.subject,
+          status: 'Completed',
+          participants: r.maxParticipants || r.participants?.length || 0,
+          duration: r.duration ? `${Math.round(r.duration)} min` : 'N/A',
+          time: r.endedAt ? new Date(r.endedAt).toLocaleString() : 'Recently',
+          host: r.createdBy?.name || 'Host',
+          isUserRoom: false,
+        }))
+        
+        // Map upcoming sessions
+        const mappedUpcoming = (statsData.upcomingSessions || []).map(r => ({
+          id: r._id,
+          name: r.name,
+          description: r.subject,
+          status: 'Scheduled',
+          participants: r.participants?.length || 0,
+          time: r.scheduledFor ? new Date(r.scheduledFor).toLocaleString() : 'Soon',
+          host: r.createdBy?.name || 'Host',
+          isUserRoom: false,
+        }))
+        
+        setActiveRooms(mappedActive)
+        setRecentSessions(mappedRecent)
+        setUpcomingSessions(mappedUpcoming)
+      } catch (err) {
+        console.error('Failed to load rooms:', err)
         if (!mounted) return
-        setSharedRooms([])
+        setActiveRooms([])
+        setRecentSessions([])
+        setUpcomingSessions([])
       } finally {
         if (mounted) setRoomsLoading(false)
       }
@@ -63,12 +88,6 @@ export default function RoomsPage() {
     }
   }, [])
 
-  const allRooms = [...sharedRooms, ...roomsData]
-
-  const filteredRooms = activeCategory === 'All Rooms'
-    ? allRooms
-    : allRooms.filter(r => r.category === activeCategory)
-
   const handleJoinByUrl = () => {
     if (!joinUrl.trim()) return
     const idMatch = joinUrl.match(/room\/([a-zA-Z0-9_-]+)/) || joinUrl.match(/id=([a-zA-Z0-9_-]+)/)
@@ -81,7 +100,7 @@ export default function RoomsPage() {
   const statusBadge = (status) => {
     const classes = {
       'Active': 'bg-green-100 text-green-700',
-      'Starting Soon': 'bg-yellow-100 text-yellow-700',
+      'Completed': 'bg-gray-100 text-gray-700',
       'Scheduled': 'bg-blue-100 text-blue-700',
     }
     return (
@@ -90,6 +109,17 @@ export default function RoomsPage() {
       </span>
     )
   }
+
+  const getCurrentRooms = () => {
+    switch (activeTab) {
+      case 'active': return activeRooms
+      case 'recent': return recentSessions
+      case 'upcoming': return upcomingSessions
+      default: return activeRooms
+    }
+  }
+
+  const currentRooms = getCurrentRooms()
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -123,29 +153,59 @@ export default function RoomsPage() {
         </div>
       </div>
 
-      {/* Category Filters */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 study-feature-tabs">
-        {categories.map(cat => (
-          <button
-            key={cat}
-            onClick={() => setActiveCategory(cat)}
-            className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
-              activeCategory === cat
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('active')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'active'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <i className="ri-live-line mr-1" />
+          Active ({activeRooms.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('recent')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'recent'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <i className="ri-history-line mr-1" />
+          Recent ({recentSessions.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('upcoming')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'upcoming'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <i className="ri-calendar-line mr-1" />
+          Upcoming ({upcomingSessions.length})
+        </button>
       </div>
 
-      {/* Active Rooms Grid */}
+      {/* Rooms Grid */}
       {roomsLoading && (
-        <div className="text-sm text-gray-500">Loading live rooms...</div>
+        <div className="text-sm text-gray-500">Loading sessions...</div>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-        {filteredRooms.map(room => (
+        {currentRooms.length === 0 && !roomsLoading && (
+          <div className="col-span-full text-center py-12">
+            <i className="ri-video-chat-line text-4xl text-gray-300" />
+            <p className="text-gray-500 mt-2 text-sm">
+              {activeTab === 'active' && 'No active rooms. Create one to get started!'}
+              {activeTab === 'recent' && 'No recent sessions yet.'}
+              {activeTab === 'upcoming' && 'No upcoming sessions scheduled.'}
+            </p>
+          </div>
+        )}
+        {currentRooms.map(room => (
           <div key={room.id} className={`bg-white border rounded-lg shadow-sm p-3 sm:p-5 ${room.isUserRoom ? 'border-indigo-200 ring-1 ring-indigo-100' : 'border-gray-200'}`}>
             <div className="flex items-start justify-between mb-3">
               <div>
@@ -162,60 +222,49 @@ export default function RoomsPage() {
             <div className="space-y-2 mb-4">
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <i className="ri-group-line" />
-                <span>{room.participants} participants (max {room.max})</span>
+                <span>{room.participants} participants</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <i className="ri-time-line" />
                 <span>{room.time}</span>
               </div>
+              {room.duration && (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <i className="ri-timer-line" />
+                  <span>Duration: {room.duration}</span>
+                </div>
+              )}
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <i className="ri-user-star-line" />
                 <span>Host: {room.host}</span>
               </div>
             </div>
-            <button
-              onClick={() => navigate(`/room/${room.id}`)}
-              className="w-full py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-            >
-              Join Room
-            </button>
+            {activeTab === 'active' && (
+              <button
+                onClick={() => navigate(`/room/${room.id}`)}
+                className="w-full py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Join Room
+              </button>
+            )}
+            {activeTab === 'recent' && (
+              <button
+                onClick={() => navigate(`/room/${room.id}`)}
+                className="w-full py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                View Details
+              </button>
+            )}
+            {activeTab === 'upcoming' && (
+              <button
+                onClick={() => navigate(`/room/${room.id}`)}
+                className="w-full py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                View Session
+              </button>
+            )}
           </div>
         ))}
-      </div>
-
-      {/* Upcoming Sessions */}
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Study Sessions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-          {upcomingRooms.map(room => (
-            <div key={room.id} className="bg-white border border-gray-200 rounded-lg shadow-sm p-3 sm:p-5">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="font-semibold text-gray-900">{room.name}</h3>
-                  <p className="text-sm text-gray-500 mt-0.5">{room.description}</p>
-                </div>
-                {statusBadge('Scheduled')}
-              </div>
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <i className="ri-calendar-line" />
-                  <span>{room.date}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <i className="ri-group-line" />
-                  <span>{room.participants} signed up</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <i className="ri-user-star-line" />
-                  <span>Host: {room.host}</span>
-                </div>
-              </div>
-              <button className="w-full py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
-                Set Reminder
-              </button>
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* Join Room Modal */}

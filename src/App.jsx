@@ -5,6 +5,10 @@ import RoomsPage from './features/rooms/RoomsPage'
 import CreateRoomPage from './features/rooms/CreateRoomPage'
 import StudyRoomPage from './features/studyroom/StudyRoomPage'
 import ProfilePage from './features/profile/ProfilePage'
+import AchievementsPage from './features/achievements/AchievementsPage'
+import AIToolsPage from './features/aitools/AIToolsPage'
+import ResourcesPage from './features/resources/ResourcesPage'
+import SchedulePage from './features/schedule/SchedulePage'
 import DashboardLayout from './components/layout/DashboardLayout'
 import { ToastProvider } from './components/ui/Toast'
 import { AuthProvider, useAuth } from './lib/auth'
@@ -42,10 +46,10 @@ function App() {
               <Route path="/" element={<DashboardPage />} />
               <Route path="/rooms" element={<RoomsPage />} />
               <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/resources" element={<PlaceholderPage title="Resources" />} />
-              <Route path="/ai-tools" element={<PlaceholderPage title="AI Tools" />} />
-              <Route path="/schedule" element={<PlaceholderPage title="Schedule" />} />
-              <Route path="/achievements" element={<PlaceholderPage title="Achievements" />} />
+              <Route path="/resources" element={<ResourcesPage />} />
+              <Route path="/ai-tools" element={<AIToolsPage />} />
+              <Route path="/schedule" element={<SchedulePage />} />
+              <Route path="/achievements" element={<AchievementsPage />} />
             </Route>
             <Route path="/create-room" element={<ProtectedRoute><CreateRoomPage /></ProtectedRoute>} />
             <Route path="/room/:id" element={<ProtectedRoute><StudyRoomPage /></ProtectedRoute>} />

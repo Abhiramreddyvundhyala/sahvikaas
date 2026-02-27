@@ -11,8 +11,10 @@ import TasksPanel from './components/TasksPanel'
 import SettingsModal from './components/SettingsModal'
 import PointsModal from './components/PointsModal'
 import VoiceAssistant from './components/VoiceAssistant'
+
 import { getSocket, connectSocket, disconnectSocket } from '../../lib/socket'
 import { useAuth } from '../../lib/auth'
+import { getRoomInfo } from '../../lib/roomApi'
 
 const featureTabs = [
   { id: 'chat', label: 'Chat', icon: 'ri-message-3-line' },
@@ -50,6 +52,7 @@ function useIsTablet() {
   return isTablet
 }
 
+
 export default function StudyRoomPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -58,6 +61,49 @@ export default function StudyRoomPage() {
   const meetingIdFromUrl = id || ''
   const isMobile = useIsMobile()
   const isTablet = useIsTablet()
+
+  // Room info state
+  const [roomInfo, setRoomInfo] = useState({ name: '', subject: '' })
+  const [roomInfoLoading, setRoomInfoLoading] = useState(true)
+  const [roomInfoError, setRoomInfoError] = useState('')
+
+  // Fetch room info on mount
+  useEffect(() => {
+    let mounted = true
+    async function fetchRoom() {
+      setRoomInfoLoading(true)
+      setRoomInfoError('')
+      try {
+        const data = await getRoomInfo(meetingIdFromUrl)
+        if (mounted) {
+          setRoomInfo({ 
+            name: data.name, 
+            subject: data.subject,
+            owner: data.createdBy?._id || data.createdBy,
+            ended: data.ended
+          })
+          // If room has ended, redirect to rooms page after 2 seconds
+          if (data.ended) {
+            setTimeout(() => {
+              navigate('/rooms')
+            }, 2000)
+          }
+        }
+      } catch (err) {
+        if (mounted) {
+          setRoomInfoError('Room not found')
+          // Redirect to rooms page after 3 seconds if room not found
+          setTimeout(() => {
+            navigate('/rooms')
+          }, 3000)
+        }
+      } finally {
+        if (mounted) setRoomInfoLoading(false)
+      }
+    }
+    if (meetingIdFromUrl) fetchRoom()
+    return () => { mounted = false }
+  }, [meetingIdFromUrl, navigate])
 
   // Use the logged-in user's real name
   const [userName] = useState(() => {
@@ -74,6 +120,7 @@ export default function StudyRoomPage() {
 
   // Participant count from socket
   const [participantCount, setParticipantCount] = useState(0)
+  const [lastParticipantCount, setLastParticipantCount] = useState(0)
   // Points from socket
   const [totalPoints, setTotalPoints] = useState(0)
 
@@ -92,6 +139,7 @@ export default function StudyRoomPage() {
 
     const handleParticipants = (list) => {
       setParticipantCount(list.length)
+      setLastParticipantCount(list.length)
     }
     const handlePoints = (data) => {
       if (data.userPoints) setTotalPoints(data.userPoints.points || 0)
@@ -178,9 +226,83 @@ export default function StudyRoomPage() {
     document.body.style.userSelect = 'none'
   }
 
-  const handleEndMeeting = () => {
-    if (confirm('Are you sure you want to leave this room?')) {
-      navigate('/rooms')
+  const [hasEnded, setHasEnded] = useState(false)
+  const [isHost, setIsHost] = useState(false)
+  const [endingRoom, setEndingRoom] = useState(false)
+
+  // Detect if current user is host/admin
+  useEffect(() => {
+    if (roomInfo && user && roomInfo.owner) {
+      setIsHost(roomInfo.owner === user._id || roomInfo.owner === user.id || roomInfo.owner === user.email || roomInfo.owner === user.name)
+    }
+  }, [roomInfo, user])
+
+  // Listen for room ended updates (socket or polling)
+  useEffect(() => {
+    if (roomInfo && roomInfo.ended) {
+      setHasEnded(true)
+      // Redirect to rooms page after 2 seconds
+      setTimeout(() => {
+        navigate('/rooms')
+      }, 2000)
+    }
+  }, [roomInfo, navigate])
+
+  // Listen for room-ended socket event
+  useEffect(() => {
+    const socket = getSocket()
+    if (!socket) return
+
+    const handleRoomEnded = (data) => {
+      setHasEnded(true)
+      alert(data.message || 'This room has ended.')
+      // Redirect to rooms page
+      setTimeout(() => {
+        navigate('/rooms')
+      }, 1000)
+    }
+
+    socket.on('room-ended', handleRoomEnded)
+
+    return () => {
+      socket.off('room-ended', handleRoomEnded)
+    }
+  }, [navigate])
+
+  // End room (host only)
+  const handleEndMeeting = async () => {
+    if (!isHost) {
+      alert('Only the host can end the room.')
+      return
+    }
+    if (!window.confirm('Are you sure you want to end this room for everyone?')) return
+    setEndingRoom(true)
+    try {
+      const socket = getSocket()
+      
+      // Try to end via MongoDB API first (if it's a persistent room)
+      try {
+        const { endRoom } = await import('../../lib/roomApiV2')
+        await endRoom(meetingIdFromUrl)
+      } catch (err) {
+        console.log('Room not in MongoDB, ending in-memory room only')
+      }
+      
+      // Emit socket event to end the in-memory room
+      if (socket && socket.connected) {
+        socket.emit('end-room', { meetingId: meetingIdFromUrl })
+      }
+      
+      setHasEnded(true)
+      
+      // Navigate back to rooms page after a short delay
+      setTimeout(() => {
+        disconnectSocket()
+        navigate('/rooms')
+      }, 1500)
+    } catch (err) {
+      alert('Failed to end room: ' + (err.message || err))
+      setEndingRoom(false)
     }
   }
 
@@ -217,10 +339,30 @@ export default function StudyRoomPage() {
           </div>
         </div>
 
+
         {/* Center: Room */}
         <div className="study-nav-center text-center min-w-0">
-          <h2 className="text-sm sm:text-base font-semibold text-gray-900 truncate">Study Room</h2>
-          <p className="text-[10px] sm:text-xs text-gray-500">Room #{id || '—'} · {participantCount} online</p>
+          {roomInfoLoading ? (
+            <h2 className="text-sm sm:text-base font-semibold text-gray-900 truncate">Loading...</h2>
+          ) : roomInfoError ? (
+            <>
+              <h2 className="text-sm sm:text-base font-semibold text-red-600 truncate">Room not found</h2>
+              <p className="text-xs text-gray-500">Redirecting to rooms...</p>
+            </>
+          ) : hasEnded ? (
+            <>
+              <h2 className="text-sm sm:text-base font-semibold text-orange-600 truncate">{roomInfo.name || 'Study Room'} (Ended)</h2>
+              <p className="text-xs text-gray-500">This room has been closed</p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-sm sm:text-base font-semibold text-gray-900 truncate">{roomInfo.name || 'Study Room'}</h2>
+              <p className="text-xs text-gray-500 truncate">{roomInfo.subject}</p>
+            </>
+          )}
+          <p className="text-[10px] sm:text-xs text-gray-500">
+            Room #{id || '—'} · {hasEnded ? `${lastParticipantCount} last online` : `${participantCount} online`}
+          </p>
         </div>
 
         {/* Right: Controls - Desktop */}
@@ -270,12 +412,29 @@ export default function StudyRoomPage() {
             </button>
           </div>
 
-          <button
-            onClick={handleEndMeeting}
-            className="w-9 h-9 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
-          >
-            <i className="ri-phone-line rotate-[135deg]" />
-          </button>
+          {/* Show End Room only for host, else show Leave Room */}
+          {isHost && !hasEnded ? (
+            <button
+              onClick={handleEndMeeting}
+              disabled={endingRoom}
+              className="w-9 h-9 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors disabled:opacity-60"
+              title="End Room for Everyone"
+            >
+              {endingRoom ? <i className="ri-loader-4-line animate-spin" /> : <i className="ri-shut-down-line" />}
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                // Disconnect socket and navigate
+                disconnectSocket()
+                navigate('/rooms')
+              }}
+              className="w-9 h-9 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+              title="Leave Room"
+            >
+              <i className="ri-phone-line rotate-[135deg]" />
+            </button>
+          )}
         </div>
 
         {/* Right: Mobile hamburger + key controls */}
@@ -293,8 +452,13 @@ export default function StudyRoomPage() {
             <i className={`text-sm ${isVideoOn ? 'ri-vidicon-line' : 'ri-vidicon-off-line'}`} />
           </button>
           <button
-            onClick={handleEndMeeting}
+            onClick={() => {
+              // Disconnect socket and navigate
+              disconnectSocket()
+              navigate('/rooms')
+            }}
             className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center"
+            title="Leave Room"
           >
             <i className="ri-phone-line rotate-[135deg] text-sm" />
           </button>

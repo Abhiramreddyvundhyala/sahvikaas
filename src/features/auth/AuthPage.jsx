@@ -84,7 +84,7 @@ function LoginForm({ onSwitch, onSuccess }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     if (!email || !password) {
@@ -92,15 +92,18 @@ function LoginForm({ onSwitch, onSuccess }) {
       return
     }
     setLoading(true)
-    setTimeout(() => {
-      const result = login({ email, password })
+    try {
+      const result = await login({ email, password })
       setLoading(false)
       if (!result.ok) {
         setError(result.error)
         return
       }
       onSuccess()
-    }, 600)
+    } catch (err) {
+      setLoading(false)
+      setError(err.message || 'Login failed.')
+    }
   }
 
   return (
@@ -221,7 +224,7 @@ function SignupForm({ onSwitch, onSuccess }) {
   const strengthLabel = ['', 'Weak', 'Fair', 'Good', 'Strong'][strength]
   const strengthColor = ['bg-gray-200', 'bg-red-500', 'bg-yellow-500', 'bg-blue-500', 'bg-green-500'][strength]
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     if (!name || !email || !password || !confirmPassword) {
@@ -237,15 +240,18 @@ function SignupForm({ onSwitch, onSuccess }) {
       return
     }
     setLoading(true)
-    setTimeout(() => {
-      const result = signup({ name, email, password })
+    try {
+      const result = await signup({ name, email, password })
       setLoading(false)
       if (!result.ok) {
         setError(result.error)
         return
       }
       onSuccess()
-    }, 600)
+    } catch (err) {
+      setLoading(false)
+      setError(err.message || 'Signup failed.')
+    }
   }
 
   return (

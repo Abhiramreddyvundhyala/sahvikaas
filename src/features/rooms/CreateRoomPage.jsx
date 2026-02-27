@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Modal from '../../components/ui/Modal'
 import { useAuth } from '../../lib/auth'
-import { createMeeting } from '../../lib/api'
+import { createRoom } from '../../lib/roomApiV2'
 
 export default function CreateRoomPage() {
   const navigate = useNavigate()
@@ -41,8 +41,7 @@ export default function CreateRoomPage() {
     }
     setLoading(true)
     try {
-      const result = await createMeeting({
-        userName: user?.name || 'Host',
+      const result = await createRoom({
         name: formData.name,
         subject: formData.subject,
         privacy: formData.privacy,
@@ -50,7 +49,7 @@ export default function CreateRoomPage() {
         video: formData.video,
       })
       setLoading(false)
-      setCreatedRoomId(result.meetingId)
+      setCreatedRoomId(result.room._id)
       setSuccessModal(true)
     } catch (error) {
       setLoading(false)

@@ -1,46 +1,153 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  PieChart, Pie, Cell
 } from 'recharts'
-
-const studyProgressData = [
-  { day: 'Mon', hours: 2.5 },
-  { day: 'Tue', hours: 3.8 },
-  { day: 'Wed', hours: 3.0 },
-  { day: 'Thu', hours: 4.2 },
-  { day: 'Fri', hours: 3.5 },
-  { day: 'Sat', hours: 5.0 },
-  { day: 'Sun', hours: 4.0 },
-]
-
-const subjectData = [
-  { name: 'Algorithms', value: 35, color: '#6366f1' },
-  { name: 'Database', value: 25, color: '#14b8a6' },
-  { name: 'Networks', value: 20, color: '#f97316' },
-  { name: 'OS', value: 20, color: '#f43f5e' },
-]
-
-const activeRooms = [
-  { id: '1', name: 'Advanced Algorithms', participants: 8 },
-  { id: '2', name: 'Database Systems', participants: 5 },
-]
-
-const recentResources = [
-  { name: 'ML Lecture Notes.pdf', size: '2.4 MB', icon: 'ri-file-pdf-2-line', color: 'text-red-500 bg-red-50' },
-  { name: 'Database Slides.pptx', size: '5.1 MB', icon: 'ri-file-ppt-2-line', color: 'text-orange-500 bg-orange-50' },
-]
-
-const upcomingSessions = [
-  { name: 'Data Structures Review', date: 'Today, 4:00 PM', participants: 6 },
-  { name: 'ML Project Discussion', date: 'Tomorrow, 2:00 PM', participants: 4 },
-]
+import { getDashboardSummary } from '../../lib/api'
+import { getUserRoomStats } from '../../lib/roomApiV2'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
+  const [loading, setLoading] = useState(true)
+  const [activeRooms, setActiveRooms] = useState([])
+  const [recentSessions, setRecentSessions] = useState([])
+  const [upcomingSessions, setUpcomingSessions] = useState([])
+  const [studyProgressData, setStudyProgressData] = useState([])
+  const [subjectData, setSubjectData] = useState([])
+  const [totalHours, setTotalHours] = useState(0)
+  const [totalSessions, setTotalSessions] = useState(0)
+
+  useEffect(() => {
+    let mounted = true
+    const loadData = async () => {
+      setLoading(true)
+      try {
+        const [dashData, roomStats] = await Promise.all([
+          getDashboardSummary().catch(() => null),
+          getUserRoomStats().catch(() => null),
+        ])
+
+        if (!mounted) return
+
+        // Load room statistics
+        if (roomStats) {
+          setActiveRooms((roomStats.activeSessions || []).slice(0, 5).map(r => ({
+            id: r._id,
+            name: r.name,
+            participants: r.participants?.length || 0,
+          })))
+          
+          setRecentSessions((roomStats.recentSessions || []).slice(0, 5).map(r => ({
+            id: r._id,
+            name: r.name,
+            duration: r.duration ? `${Math.round(r.duration)} min` : 'N/A',
+            time: r.endedAt ? new Date(r.endedAt).toLocaleString() : 'Recently',
+          })))
+          
+          setUpcomingSessions((roomStats.upcomingSessions || []).slice(0, 5).map(r => ({
+            id: r._id,
+            name: r.name,
+            time: r.scheduledFor ? new Date(r.scheduledFor).toLocaleString() : 'Soon',
+          })))
+          
+          setTotalHours(roomStats.totalHours || 0)
+          setTotalSessions(roomStats.totalSessions || 0)
+          
+          // Subject distribution from room stats
+          if (roomStats.subjectDistribution) {
+            const subjectColors = ['#6366f1', '#14b8a6', '#f97316', '#f43f5e', '#8b5cf6', '#06b6d4', '#eab308', '#ec4899']
+            const totalMinutes = Object.values(roomStats.subjectDistribution).reduce((a, b) => a + b, 0) || 1
+            const subjects = Object.entries(roomStats.subjectDistribution).map(([name, minutes], i) => ({
+              name,
+              value: Math.round((minutes / totalMinutes) * 100),
+              color: subjectColors[i % subjectColors.length],
+            }))
+            setSubjectData(subjects)
+          }
+        }
+
+        // Load dashboard data (for study progress chart)
+        if (dashData?.ok) {
+          setStudyProgressData(dashData.studyProgress || [])
+          // If no subject data from rooms, use dashboard data
+          if (!roomStats?.subjectDistribution && dashData.subjectDistribution) {
+            setSubjectData(dashData.subjectDistribution)
+          }
+        }
+      } catch (err) {
+        console.error('Dashboard load error:', err)
+      }
+      if (mounted) setLoading(false)
+    }
+    loadData()
+    return () => { mounted = false }
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-gray-500">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg bg-indigo-100 flex items-center justify-center">
+              <i className="ri-time-line text-2xl text-indigo-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Total Study Time</p>
+              <p className="text-2xl font-bold text-gray-900">{totalHours}h</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center">
+              <i className="ri-video-chat-line text-2xl text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Total Sessions</p>
+              <p className="text-2xl font-bold text-gray-900">{totalSessions}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
+              <i className="ri-live-line text-2xl text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Active Now</p>
+              <p className="text-2xl font-bold text-gray-900">{activeRooms.length}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center">
+              <i className="ri-calendar-line text-2xl text-orange-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Upcoming</p>
+              <p className="text-2xl font-bold text-gray-900">{upcomingSessions.length}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Top Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
         {/* Active Study Rooms */}
@@ -52,7 +159,9 @@ export default function DashboardPage() {
             </button>
           </div>
           <div className="p-4 space-y-3">
-            {activeRooms.map(room => (
+            {activeRooms.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">No active rooms right now</p>
+            ) : activeRooms.map(room => (
               <div key={room.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
                   <p className="text-sm font-medium text-gray-900">{room.name}</p>
@@ -69,23 +178,25 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent Resources */}
+        {/* Recent Sessions */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between p-4 border-b border-gray-100">
-            <h3 className="font-semibold text-gray-900">Recent Resources</h3>
-            <button onClick={() => navigate('/resources')} className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+            <h3 className="font-semibold text-gray-900">Recent Sessions</h3>
+            <button onClick={() => navigate('/rooms')} className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
               View All
             </button>
           </div>
           <div className="p-4 space-y-3">
-            {recentResources.map((res, i) => (
+            {recentSessions.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">No recent sessions</p>
+            ) : recentSessions.map((session, i) => (
               <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${res.color}`}>
-                  <i className={`${res.icon} text-xl`} />
+                <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center">
+                  <i className="ri-video-line text-xl text-gray-600" />
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{res.name}</p>
-                  <p className="text-xs text-gray-500">{res.size}</p>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-900">{session.name}</p>
+                  <p className="text-xs text-gray-500">{session.duration} • {session.time}</p>
                 </div>
               </div>
             ))}
@@ -101,16 +212,20 @@ export default function DashboardPage() {
             </button>
           </div>
           <div className="p-4 space-y-3">
-            {upcomingSessions.map((session, i) => (
+            {upcomingSessions.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">No upcoming sessions</p>
+            ) : upcomingSessions.map((session, i) => (
               <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
                   <p className="text-sm font-medium text-gray-900">{session.name}</p>
-                  <p className="text-xs text-gray-500">{session.date}</p>
+                  <p className="text-xs text-gray-500">{session.time}</p>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-gray-500">
-                  <i className="ri-group-line" />
-                  {session.participants}
-                </div>
+                <button
+                  onClick={() => navigate(`/room/${session.id}`)}
+                  className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  View
+                </button>
               </div>
             ))}
           </div>
@@ -128,48 +243,56 @@ export default function DashboardPage() {
               <button className="px-3 py-1 text-xs font-medium rounded-md text-gray-500 hover:text-gray-700">Month</button>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={studyProgressData}>
-              <defs>
-                <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="day" tick={{ fontSize: 12, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 12, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-              <Tooltip
-                contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px' }}
-                formatter={(value) => [`${value} hrs`, 'Study Time']}
-              />
-              <Area type="monotone" dataKey="hours" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#colorHours)" />
-            </AreaChart>
-          </ResponsiveContainer>
+          {studyProgressData.length === 0 ? (
+            <div className="flex items-center justify-center h-[200px] text-sm text-gray-400">No study data yet. Start a session!</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={studyProgressData}>
+                <defs>
+                  <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="day" tick={{ fontSize: 12, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px' }}
+                  formatter={(value) => [`${value} hrs`, 'Study Time']}
+                />
+                <Area type="monotone" dataKey="hours" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#colorHours)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
         {/* Subject Distribution */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 sm:p-4">
           <h3 className="font-semibold text-gray-900 mb-4">Subject Distribution</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie
-                data={subjectData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={90}
-                paddingAngle={4}
-                dataKey="value"
-                label={({ name, value }) => `${name} ${value}%`}
-              >
-                {subjectData.map((entry, index) => (
-                  <Cell key={index} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value) => [`${value}%`]} />
-            </PieChart>
-          </ResponsiveContainer>
+          {subjectData.length === 0 ? (
+            <div className="flex items-center justify-center h-[200px] text-sm text-gray-400">No subject data available</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={subjectData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={90}
+                  paddingAngle={4}
+                  dataKey="value"
+                  label={({ name, value }) => `${name} ${value}%`}
+                >
+                  {subjectData.map((entry, index) => (
+                    <Cell key={index} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => [`${value}%`]} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </div>

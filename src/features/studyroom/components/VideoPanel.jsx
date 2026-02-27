@@ -4,14 +4,10 @@ import { getWebRtcIceConfig } from '../../../lib/api'
 
 const DEFAULT_ICE_CONFIG = {
   iceServers: [
-    // Google STUN servers
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
-    
-    // Metered TURN servers (free, more reliable)
+    { urls: 'stun:openrelay.metered.ca:80' },
     {
       urls: 'turn:openrelay.metered.ca:80',
       username: 'openrelayproject',
@@ -27,28 +23,8 @@ const DEFAULT_ICE_CONFIG = {
       username: 'openrelayproject',
       credential: 'openrelayproject',
     },
-    
-    // Additional free TURN servers as backup
-    {
-      urls: 'turn:relay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-    {
-      urls: 'turn:relay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-    {
-      urls: 'turn:relay.metered.ca:443?transport=tcp',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
   ],
   iceCandidatePoolSize: 10,
-  iceTransportPolicy: 'all', // Try all connection types
-  bundlePolicy: 'max-bundle',
-  rtcpMuxPolicy: 'require',
 }
 
 export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenSharing, onScreenShareChange, userName }) {
@@ -75,34 +51,21 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
 
     const connectToRoom = async () => {
       try {
-        console.log(`🚀 Connecting to room ${meetingId}...`)
         setConnecting(true)
         setError('')
 
-        console.log('📹 Requesting camera and microphone access...')
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
           audio: { echoCancellation: true, noiseSuppression: true },
         })
 
-        if (cancelled) { 
-          console.log('❌ Connection cancelled, stopping tracks')
-          stream.getTracks().forEach(t => t.stop())
-          return 
-        }
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return }
 
-        console.log('✅ Media stream acquired:', {
-          videoTracks: stream.getVideoTracks().length,
-          audioTracks: stream.getAudioTracks().length,
-          streamId: stream.id
-        })
-        
         localStreamRef.current = stream
         if (localVideoRef.current) localVideoRef.current.srcObject = stream
         stream.getAudioTracks().forEach(t => { t.enabled = isMicOn })
         stream.getVideoTracks().forEach(t => { t.enabled = isVideoOn })
 
-        console.log('🧊 Fetching ICE configuration...')
         try {
           const remoteIceConfig = await getWebRtcIceConfig()
           if (remoteIceConfig?.iceServers?.length) {
@@ -110,50 +73,23 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
               ...DEFAULT_ICE_CONFIG,
               ...remoteIceConfig,
             }
-            console.log('✅ ICE configuration loaded')
           }
         } catch {
-          console.log('⚠️ Using default ICE configuration')
           iceConfigRef.current = DEFAULT_ICE_CONFIG
         }
 
         activeMeetingRef.current = meetingId
-        
-        // Get socket connection
-        console.log('🔌 Getting socket connection...')
-        let socket = getSocket()
-        
-        if (!socket?.connected) {
-          console.log('🔌 Socket not connected, connecting...')
-          socket = await connectSocket()
-        }
-        
-        socketRef.current = socket
-        
-        if (!socketRef.current?.connected) {
-          console.error('❌ Socket failed to connect after waiting')
-          setError('Failed to connect to server. Please refresh.')
-          setConnecting(false)
-          return
-        }
-        
-        console.log('✅ Socket ready:', socketRef.current.id)
-        
-        // CRITICAL: Setup listeners BEFORE joining
+        // Use the shared socket (connected by StudyRoomPage) — do NOT own the socket lifecycle
+        const socket = getSocket()
+        if (!socket?.connected) connectSocket()
+        socketRef.current = socket || getSocket()
         setupSocketListeners(socketRef.current)
-        
-        // Small delay to ensure listeners are registered
-        await new Promise(resolve => setTimeout(resolve, 100))
-        
-        console.log(`📡 Joining meeting ${meetingId} as ${userNameRef.current}`)
         socketRef.current.emit('join-meeting', { meetingId, userName: userNameRef.current })
-        
         setConnected(true)
         setConnecting(false)
-        console.log('✅ Successfully connected to room')
       } catch (err) {
         if (!cancelled) {
-          console.error('❌ Video connect error:', err)
+          console.error('Video connect error:', err)
           setError('Camera/mic access denied. Please allow permissions.')
           setConnecting(false)
         }
@@ -192,110 +128,38 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
 
   // ========== WebRTC Peer Connection ==========
   const createPeerConnection = useCallback((remoteSocketId, remoteName) => {
-    // Check if peer connection already exists
     const existingPeer = peersRef.current.get(remoteSocketId)
     if (existingPeer) {
-      console.log(`♻️ Reusing existing peer connection for ${remoteName}`)
       return existingPeer
     }
 
-    console.log(`🆕 Creating new peer connection for ${remoteName} (${remoteSocketId})`)
-    
-    // Verify we have local stream
-    if (!localStreamRef.current) {
-      console.error(`❌ Cannot create peer connection for ${remoteName}: No local stream!`)
-      return null
-    }
-    
     const pc = new RTCPeerConnection(iceConfigRef.current || DEFAULT_ICE_CONFIG)
 
-    // Add local tracks to the peer connection
-    const tracks = localStreamRef.current.getTracks()
-    console.log(`➕ Adding ${tracks.length} tracks to peer connection for ${remoteName}`)
-    
-    tracks.forEach(track => {
-      console.log(`   Adding ${track.kind} track (enabled: ${track.enabled}, readyState: ${track.readyState})`)
-      const sender = pc.addTrack(track, localStreamRef.current)
-      console.log(`   Sender created:`, sender.track ? 'OK' : 'NO TRACK')
-    })
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => {
+        pc.addTrack(track, localStreamRef.current)
+      })
+    }
 
     pc.ontrack = (event) => {
-      console.log(`📥 Received ${event.track.kind} track from ${remoteName}`)
       const [remoteStream] = event.streams
-      if (remoteStream) {
-        console.log(`✅ Setting remote stream for ${remoteName}, stream ID: ${remoteStream.id}`)
-        console.log(`   Stream has ${remoteStream.getTracks().length} tracks:`, 
-          remoteStream.getTracks().map(t => `${t.kind} (${t.enabled ? 'enabled' : 'disabled'})`))
-        
-        setParticipants(prev => {
-          const next = new Map(prev)
-          const existing = next.get(remoteSocketId) || {}
-          next.set(remoteSocketId, { 
-            ...existing, 
-            name: remoteName, 
-            stream: remoteStream,
-            audioOn: existing.audioOn ?? true,
-            videoOn: existing.videoOn ?? true
-          })
-          console.log(`✅ Updated participant ${remoteName} with stream`)
-          return next
-        })
-      } else {
-        console.warn(`⚠️ No remote stream in track event from ${remoteName}`)
-      }
+      setParticipants(prev => {
+        const next = new Map(prev)
+        const existing = next.get(remoteSocketId) || {}
+        next.set(remoteSocketId, { ...existing, name: remoteName, stream: remoteStream })
+        return next
+      })
     }
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log(`🧊 Sending ICE candidate to ${remoteName}`)
         socketRef.current?.emit('ice-candidate', { to: remoteSocketId, candidate: event.candidate })
       }
     }
 
-    pc.onnegotiationneeded = async () => {
-      console.log(`🔄 Negotiation needed for ${remoteName}`)
-    }
-
-    pc.oniceconnectionstatechange = () => {
-      console.log(`🔌 ICE connection state for ${remoteName}: ${pc.iceConnectionState}`)
-      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
-        console.log(`✅ Successfully connected to ${remoteName}`)
-      } else if (pc.iceConnectionState === 'failed') {
-        console.error(`❌ ICE connection failed for ${remoteName}`)
-        console.log(`🔄 Attempting ICE restart for ${remoteName}...`)
-        
-        // Attempt ICE restart
-        setTimeout(async () => {
-          try {
-            if (pc.signalingState === 'stable') {
-              console.log(`   Creating new offer with ICE restart...`)
-              const offer = await pc.createOffer({ iceRestart: true })
-              await pc.setLocalDescription(offer)
-              socketRef.current?.emit('offer', { to: remoteSocketId, offer })
-              console.log(`   ICE restart offer sent to ${remoteName}`)
-            }
-          } catch (err) {
-            console.error(`   ICE restart failed:`, err)
-          }
-        }, 1000)
-      } else if (pc.iceConnectionState === 'disconnected') {
-        console.warn(`⚠️ ICE connection disconnected for ${remoteName}`)
-        console.log(`   Waiting 3 seconds before attempting reconnection...`)
-        
-        // Wait a bit before trying to reconnect
-        setTimeout(() => {
-          if (pc.iceConnectionState === 'disconnected') {
-            console.log(`   Still disconnected, attempting ICE restart...`)
-            pc.restartIce()
-          }
-        }, 3000)
-      }
-    }
-
     pc.onconnectionstatechange = () => {
-      console.log(`🔗 Connection state for ${remoteName}: ${pc.connectionState}`)
       if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-        console.warn(`⚠️ Peer ${remoteSocketId} connection ${pc.connectionState}`)
+        console.warn('Peer ' + remoteSocketId + ' connection ' + pc.connectionState)
       }
     }
 
@@ -328,13 +192,6 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
 
   // ========== Socket listeners ==========
   const setupSocketListeners = useCallback((socket) => {
-    if (!socket) {
-      console.error('❌ Socket is null, cannot setup listeners')
-      return
-    }
-    
-    console.log('🔧 Setting up socket listeners...')
-    
     // Remove any previous WebRTC listeners to prevent duplicates (critical for React StrictMode)
     socket.off('existing-participants')
     socket.off('user-joined')
@@ -345,179 +202,66 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
     socket.off('media-state')
 
     socket.on('existing-participants', async (existingUsers) => {
-      console.log('📥 Received existing-participants event')
-      console.log('   Existing users:', existingUsers)
-      console.log('📊 Current state:', {
-        hasLocalStream: !!localStreamRef.current,
-        localTracks: localStreamRef.current?.getTracks().map(t => `${t.kind}:${t.enabled}:${t.readyState}`),
-        existingPeers: Array.from(peersRef.current.keys()),
-        socketId: socket.id
-      })
-      
-      if (!localStreamRef.current) {
-        console.error('❌ No local stream available to create offers!')
-        return
-      }
-      
-      if (!existingUsers || existingUsers.length === 0) {
-        console.log('ℹ️ No existing users in room, waiting for others to join')
-        return
-      }
-      
       for (const user of existingUsers) {
-        try {
-          console.log(`🤝 Creating offer for ${user.name} (${user.socketId})`)
-          const pc = createPeerConnection(user.socketId, user.name)
-          
-          if (!pc) {
-            console.error(`❌ Failed to create peer connection for ${user.name}`)
-            continue
-          }
-          
-          // Verify tracks were added
-          const senders = pc.getSenders()
-          console.log(`   Peer connection has ${senders.length} senders:`, 
-            senders.map(s => s.track ? `${s.track.kind}:${s.track.enabled}` : 'no-track'))
-          
-          if (senders.length === 0) {
-            console.error(`❌ No senders in peer connection for ${user.name}!`)
-            continue
-          }
-          
-          const offer = await pc.createOffer({
-            offerToReceiveAudio: true,
-            offerToReceiveVideo: true,
-          })
-          
-          console.log(`   Offer created:`, {
-            type: offer.type,
-            sdpLength: offer.sdp?.length || 0
-          })
-          
-          await pc.setLocalDescription(offer)
-          console.log(`   Local description set`)
-          
-          socket.emit('offer', { to: user.socketId, offer })
-          console.log(`✅ Offer sent to ${user.name}`)
-        } catch (error) {
-          console.error(`❌ Failed to create offer for ${user.name}:`, error)
-        }
+        const pc = createPeerConnection(user.socketId, user.name)
+        const offer = await pc.createOffer()
+        await pc.setLocalDescription(offer)
+        socket.emit('offer', { to: user.socketId, offer })
       }
     })
 
     socket.on('user-joined', (user) => {
-      console.log(`👤 User joined: ${user.name} (${user.socketId})`)
       setParticipants(prev => {
         const next = new Map(prev)
-        next.set(user.socketId, { 
-          name: user.name, 
-          stream: null, 
-          audioOn: user.audioOn ?? true, 
-          videoOn: user.videoOn ?? true 
-        })
+        next.set(user.socketId, { name: user.name, stream: null, audioOn: true, videoOn: true })
         return next
       })
     })
 
     socket.on('offer', async ({ from, offer, userName: remoteName }) => {
-      try {
-        console.log(`📥 Received offer event`)
-        console.log(`   From: ${remoteName} (${from})`)
-        console.log(`   Offer type: ${offer?.type}, SDP length: ${offer?.sdp?.length || 0}`)
-        console.log(`   Local stream available: ${!!localStreamRef.current}`)
-        
-        if (!localStreamRef.current) {
-          console.error(`❌ Cannot handle offer: No local stream!`)
-          return
-        }
-        
-        const pc = createPeerConnection(from, remoteName)
-        
-        if (!pc) {
-          console.error(`❌ Failed to create peer connection for ${remoteName}`)
-          return
-        }
-        
-        console.log(`   Setting remote description...`)
-        await pc.setRemoteDescription(new RTCSessionDescription(offer))
-        console.log(`✅ Remote description set for ${remoteName}`)
-        
-        await flushQueuedIceCandidates(from)
-        
-        console.log(`   Creating answer...`)
-        const answer = await pc.createAnswer()
-        console.log(`   Answer created, setting local description...`)
-        await pc.setLocalDescription(answer)
-        console.log(`   Sending answer to ${remoteName}...`)
-        socket.emit('answer', { to: from, answer })
-        console.log(`✅ Answer sent to ${remoteName}`)
-      } catch (error) {
-        console.error(`❌ Failed to handle offer from ${remoteName || from}:`, error)
-      }
+      const pc = createPeerConnection(from, remoteName)
+      await pc.setRemoteDescription(new RTCSessionDescription(offer))
+      await flushQueuedIceCandidates(from)
+      const answer = await pc.createAnswer()
+      await pc.setLocalDescription(answer)
+      socket.emit('answer', { to: from, answer })
     })
 
-    socket.on('answer', async ({ from, answer, userName: remoteName }) => {
-      try {
-        console.log(`📥 Received answer from ${remoteName || from}`)
-        const pc = peersRef.current.get(from)
-        if (pc) {
-          await pc.setRemoteDescription(new RTCSessionDescription(answer))
-          console.log(`✅ Remote description set from answer for ${remoteName || from}`)
-          await flushQueuedIceCandidates(from)
-        } else {
-          console.warn(`⚠️ No peer connection found for ${from}`)
-        }
-      } catch (error) {
-        console.error(`❌ Failed to handle answer from ${remoteName || from}:`, error)
+    socket.on('answer', async ({ from, answer }) => {
+      const pc = peersRef.current.get(from)
+      if (pc) {
+        await pc.setRemoteDescription(new RTCSessionDescription(answer))
+        await flushQueuedIceCandidates(from)
       }
     })
 
     socket.on('ice-candidate', async ({ from, candidate }) => {
       const pc = peersRef.current.get(from)
-      if (!pc) {
-        console.warn(`⚠️ Received ICE candidate from ${from} but no peer connection exists, queuing...`)
+      if (!pc || !pc.remoteDescription) {
         queueIceCandidate(from, candidate)
         return
       }
 
-      if (!pc.remoteDescription) {
-        console.log(`⏳ Queuing ICE candidate from ${from} (no remote description yet)`)
-        queueIceCandidate(from, candidate)
-        return
-      }
-
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate))
-        console.log(`✅ ICE candidate added for ${from}`)
-      } catch (e) {
-        console.warn(`⚠️ Failed to add ICE candidate from ${from}, queuing:`, e)
-        queueIceCandidate(from, candidate)
+      if (pc) {
+        try { await pc.addIceCandidate(new RTCIceCandidate(candidate)) }
+        catch (e) {
+          queueIceCandidate(from, candidate)
+          console.warn('Failed to add ICE candidate:', e)
+        }
       }
     })
 
     socket.on('user-left', ({ id }) => {
-      console.log(`👋 User left: ${id}`)
       const pc = peersRef.current.get(id)
-      if (pc) { 
-        pc.close()
-        peersRef.current.delete(id)
-        console.log(`🔌 Closed peer connection for ${id}`)
-      }
-      setParticipants(prev => { 
-        const next = new Map(prev)
-        next.delete(id)
-        return next 
-      })
+      if (pc) { pc.close(); peersRef.current.delete(id) }
+      setParticipants(prev => { const next = new Map(prev); next.delete(id); return next })
     })
 
     socket.on('media-state', ({ from, audio, video }) => {
-      console.log(`🎤📹 Media state update from ${from}: audio=${audio}, video=${video}`)
       setParticipants(prev => {
         const next = new Map(prev)
         const existing = next.get(from)
-        if (existing) {
-          next.set(from, { ...existing, audioOn: audio, videoOn: video })
-        }
+        if (existing) next.set(from, { ...existing, audioOn: audio, videoOn: video })
         return next
       })
     })
@@ -652,7 +396,7 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
 
           {/* Remote participants */}
           {[...participants.entries()].map(([socketId, participant]) => (
-            <RemoteVideo key={socketId} participant={participant} socketId={socketId} />
+            <RemoteVideo key={socketId} participant={participant} />
           ))}
         </div>
       </div>
@@ -660,69 +404,29 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
   )
 }
 
-function RemoteVideo({ participant, socketId }) {
+function RemoteVideo({ participant }) {
   const videoRef = useRef(null)
-  const [hasVideo, setHasVideo] = useState(false)
 
   useEffect(() => {
-    if (videoRef.current && participant.stream) {
-      console.log(`🎥 Setting srcObject for ${participant.name} (${socketId})`)
-      console.log(`   Stream ID: ${participant.stream.id}`)
-      console.log(`   Tracks:`, participant.stream.getTracks().map(t => 
-        `${t.kind}:${t.enabled}:${t.readyState}`
-      ))
-      
-      videoRef.current.srcObject = participant.stream
-      
-      // Force play in case autoplay is blocked
-      videoRef.current.play()
-        .then(() => {
-          console.log(`✅ Video playing for ${participant.name}`)
-          setHasVideo(true)
-        })
-        .catch(err => {
-          console.warn(`⚠️ Autoplay blocked for ${participant.name}:`, err)
-          // Try to play on user interaction
-          videoRef.current.onclick = () => {
-            videoRef.current.play()
-              .then(() => setHasVideo(true))
-              .catch(console.error)
-          }
-        })
-    } else {
-      console.log(`⏳ Waiting for stream from ${participant.name} (${socketId})`)
-      setHasVideo(false)
-    }
-  }, [participant.stream, participant.name, socketId])
-
-  const hasStream = !!participant.stream
-  const showVideo = hasStream && participant.videoOn !== false
+    if (videoRef.current && participant.stream) videoRef.current.srcObject = participant.stream
+  }, [participant.stream])
 
   return (
     <div className="relative rounded-lg overflow-hidden bg-gray-800 min-h-0">
-      {hasStream && (
-        <video 
-          ref={videoRef} 
-          autoPlay 
-          playsInline 
-          className={'w-full h-full object-cover' + (!showVideo ? ' hidden' : '')} 
-        />
+      {participant.stream && (
+        <video ref={videoRef} autoPlay playsInline className={'w-full h-full object-cover' + (participant.videoOn === false ? ' hidden' : '')} />
       )}
-      {(!hasStream || !showVideo) && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-800">
-          <div className="w-12 h-12 rounded-full bg-emerald-600 flex items-center justify-center text-white text-lg font-bold mb-2">
+      {(!participant.stream || participant.videoOn === false) && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+          <div className="w-12 h-12 rounded-full bg-emerald-600 flex items-center justify-center text-white text-lg font-bold">
             {(participant.name || '?').charAt(0).toUpperCase()}
           </div>
-          {!hasStream && (
-            <div className="text-xs text-gray-400 animate-pulse">Connecting...</div>
-          )}
         </div>
       )}
       <div className="absolute bottom-1.5 left-1.5">
         <span className="px-2 py-0.5 bg-black/60 text-white text-[10px] rounded-full flex items-center gap-1">
           {participant.name || 'Peer'}
           {participant.audioOn === false && <i className="ri-mic-off-fill text-red-400" />}
-          {!hasStream && <i className="ri-loader-4-line animate-spin text-yellow-400" />}
         </span>
       </div>
     </div>

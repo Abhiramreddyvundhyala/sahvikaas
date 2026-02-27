@@ -83,13 +83,6 @@ export default function AIAssistant() {
             </div>
             <p className="text-sm font-medium text-gray-600">AI Study Assistant</p>
             <p className="text-xs text-gray-400 mt-1 max-w-[240px]">Powered by Gemini AI. Ask questions, get explanations, solve problems, or request study help.</p>
-            <div className="flex flex-wrap justify-center gap-1.5 mt-3">
-              {['Explain recursion', 'What is Big O?', 'Help with calculus'].map(q => (
-                <button key={q} onClick={() => setInput(q)} className="px-2.5 py-1 text-xs bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors">
-                  {q}
-                </button>
-              ))}
-            </div>
           </div>
         )}
         {messages.map((msg, i) => (

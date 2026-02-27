@@ -9,9 +9,24 @@ import { fileURLToPath } from 'url'
 import { createServer } from 'http'
 import { Server as SocketServer } from 'socket.io'
 import { v4 as uuidv4 } from 'uuid'
-import * as mediasoupServer from './mediasoup-server.js'
+import { connectDB } from './db.js'
+
+// Model imports
+import Room from './models/Room.js'
+
+// Route imports
+import authRoutes from './routes/auth.js'
+import scheduleRoutes from './routes/schedule.js'
+import resourceRoutes from './routes/resources.js'
+
+import achievementRoutes from './routes/achievements.js'
+import dashboardRoutes from './routes/dashboard.js'
+import roomsRoutes from './routes/rooms.js'
 
 dotenv.config()
+
+// Connect to MongoDB
+connectDB()
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -57,6 +72,7 @@ function getOrCreateRoom(roomId, creatorName = 'Host', roomMeta = {}) {
       audio: roomMeta.audio ?? true,
       video: roomMeta.video ?? true,
       createdAt: new Date().toISOString(),
+      ended: false, // new flag
       participants: new Map(),
       chatMessages: [],
       tasks: [],
@@ -67,6 +83,19 @@ function getOrCreateRoom(roomId, creatorName = 'Host', roomMeta = {}) {
     })
   }
   return rooms.get(roomId)
+}
+
+// Helper function to sync participant count with MongoDB
+async function syncParticipantCount(roomId, participantCount) {
+  try {
+    const room = await Room.findById(roomId)
+    if (room && participantCount > room.maxParticipants) {
+      room.maxParticipants = participantCount
+      await room.save()
+    }
+  } catch (err) {
+    console.error('Failed to sync participant count:', err.message)
+  }
 }
 
 function getParticipantsList(room) {
@@ -101,8 +130,6 @@ function getIceConfig() {
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
   ]
 
   const turnUrlsFromEnv = (process.env.WEBRTC_TURN_URLS || '')
@@ -116,7 +143,6 @@ function getIceConfig() {
   const turnServers = turnUrlsFromEnv.length > 0 && turnUsername && turnCredential
     ? turnUrlsFromEnv.map(url => ({ urls: url, username: turnUsername, credential: turnCredential }))
     : [
-        // Metered TURN servers (primary)
         {
           urls: 'turn:openrelay.metered.ca:80',
           username: 'openrelayproject',
@@ -132,36 +158,27 @@ function getIceConfig() {
           username: 'openrelayproject',
           credential: 'openrelayproject',
         },
-        // Backup TURN servers
-        {
-          urls: 'turn:relay.metered.ca:80',
-          username: 'openrelayproject',
-          credential: 'openrelayproject',
-        },
-        {
-          urls: 'turn:relay.metered.ca:443',
-          username: 'openrelayproject',
-          credential: 'openrelayproject',
-        },
-        {
-          urls: 'turn:relay.metered.ca:443?transport=tcp',
-          username: 'openrelayproject',
-          credential: 'openrelayproject',
-        },
       ]
 
   return {
     iceServers: [...stunServers, ...turnServers],
     iceCandidatePoolSize: 10,
     iceTransportPolicy: process.env.WEBRTC_FORCE_RELAY === 'true' ? 'relay' : 'all',
-    bundlePolicy: 'max-bundle',
-    rtcpMuxPolicy: 'require',
   }
 }
 
 // Middleware
 app.use(cors())
 app.use(express.json({ limit: '50mb' }))
+
+// ─── API Routes (MongoDB-backed) ───
+
+app.use('/api/auth', authRoutes)
+app.use('/api/schedule', scheduleRoutes)
+app.use('/api/resources', resourceRoutes)
+app.use('/api/achievements', achievementRoutes)
+app.use('/api/dashboard', dashboardRoutes)
+app.use('/api/rooms', roomsRoutes)
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, 'uploads')
@@ -517,6 +534,7 @@ app.post('/api/meetings/create', (req, res) => {
       video: room.video,
       createdBy: room.createdBy,
       createdAt: room.createdAt,
+      ended: room.ended,
       participantCount: room.participants.size,
     },
   })
@@ -534,6 +552,7 @@ app.get('/api/meetings', (req, res) => {
       video: room.video,
       createdBy: room.createdBy,
       createdAt: room.createdAt,
+      ended: room.ended,
       participantCount: room.participants.size,
     }))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -553,6 +572,7 @@ app.get('/api/meetings/:id', (req, res) => {
     audio: room.audio,
     video: room.video,
     createdBy: room.createdBy,
+    ended: room.ended,
     participantCount: room.participants.size,
     participants: getParticipantsList(room),
   })
@@ -582,7 +602,10 @@ io.on('connection', (socket) => {
   // ─── JOIN ROOM ───────────────────────────────
   socket.on('join-meeting', ({ meetingId, userName }) => {
     const room = getOrCreateRoom(meetingId, userName)
-
+    if (room.ended) {
+      socket.emit('room-ended', { message: 'This room has been ended by the host.' })
+      return
+    }
     const participant = {
       id: socket.id,
       name: userName,
@@ -590,6 +613,7 @@ io.on('connection', (socket) => {
       joinedAt: new Date().toISOString(),
       audioOn: true,
       videoOn: true,
+      isHost: userName === room.createdBy,
     }
     room.participants.set(socket.id, participant)
 
@@ -600,15 +624,23 @@ io.on('connection', (socket) => {
     // Send FULL room state to the new joiner for session initialization
     const existingParticipants = []
     for (const [sid, p] of room.participants) {
-      if (sid !== socket.id) {
-        existingParticipants.push({
-          socketId: p.socketId,
-          name: p.name,
-          audioOn: p.audioOn,
-          videoOn: p.videoOn,
-        })
-      }
+      if (sid !== socket.id) existingParticipants.push(p)
     }
+  // Host/admin ends the room for all
+  socket.on('end-room', ({ meetingId }) => {
+    const room = rooms.get(meetingId)
+    if (!room) return
+    // Only host can end
+    if (socket.userName !== room.createdBy) return
+    room.ended = true
+    io.to(meetingId).emit('room-ended', { message: 'The host has ended this room.' })
+    // Optionally, disconnect all users from the room
+    for (const [sid] of room.participants) {
+      const s = io.sockets.sockets.get(sid)
+      if (s) s.leave(meetingId)
+    }
+    room.participants.clear()
+  })
 
     socket.emit('existing-participants', existingParticipants)
 
@@ -627,6 +659,11 @@ io.on('connection', (socket) => {
 
     // Broadcast updated participant list to everyone in the room
     io.to(meetingId).emit('participants-updated', getParticipantsList(room))
+
+    // Sync participant count with MongoDB (if room exists in DB)
+    syncParticipantCount(meetingId, room.participants.size).catch(err => {
+      console.log('Note: Room not in MongoDB (in-memory only)')
+    })
 
     // Add a system chat message
     const joinMsg = {
@@ -651,13 +688,11 @@ io.on('connection', (socket) => {
 
   // ─── WEBRTC SIGNALING ───────────────────────
   socket.on('offer', ({ to, offer }) => {
-    console.log(`📡 Forwarding offer from ${socket.userName} (${socket.id}) to ${to}`)
     io.to(to).emit('offer', { from: socket.id, offer, userName: socket.userName })
   })
 
   socket.on('answer', ({ to, answer }) => {
-    console.log(`📡 Forwarding answer from ${socket.userName} (${socket.id}) to ${to}`)
-    io.to(to).emit('answer', { from: socket.id, answer, userName: socket.userName })
+    io.to(to).emit('answer', { from: socket.id, answer })
   })
 
   socket.on('ice-candidate', ({ to, candidate }) => {
@@ -680,127 +715,6 @@ io.on('connection', (socket) => {
   // ─── SCREEN SHARING ─────────────────────────
   socket.on('screen-share', ({ meetingId, sharing }) => {
     socket.to(meetingId).emit('screen-share', { from: socket.id, sharing, userName: socket.userName })
-  })
-
-  // ═══════════════════════════════════════════════════════════
-  // MEDIASOUP SFU HANDLERS
-  // ═══════════════════════════════════════════════════════════
-
-  // Get router RTP capabilities
-  socket.on('getRouterRtpCapabilities', async ({ roomId }, callback) => {
-    try {
-      const rtpCapabilities = await mediasoupServer.getRouterRtpCapabilities(roomId)
-      callback({ rtpCapabilities })
-    } catch (error) {
-      console.error('getRouterRtpCapabilities error:', error)
-      callback({ error: error.message })
-    }
-  })
-
-  // Create WebRTC transport
-  socket.on('createWebRtcTransport', async ({ roomId, direction }, callback) => {
-    try {
-      const transport = await mediasoupServer.createWebRtcTransport(roomId, socket.id)
-      callback({ transport })
-    } catch (error) {
-      console.error('createWebRtcTransport error:', error)
-      callback({ error: error.message })
-    }
-  })
-
-  // Connect transport
-  socket.on('connectTransport', async ({ roomId, transportId, dtlsParameters }, callback) => {
-    try {
-      await mediasoupServer.connectTransport(roomId, transportId, dtlsParameters)
-      callback({ success: true })
-    } catch (error) {
-      console.error('connectTransport error:', error)
-      callback({ error: error.message })
-    }
-  })
-
-  // Produce (send media to server)
-  socket.on('produce', async ({ roomId, transportId, kind, rtpParameters, appData }, callback) => {
-    try {
-      const { id } = await mediasoupServer.produce(roomId, socket.id, transportId, kind, rtpParameters, appData)
-      
-      // Notify other peers about new producer
-      socket.to(roomId).emit('newProducer', {
-        producerId: id,
-        peerId: socket.id,
-        peerName: socket.userName || 'Unknown',
-        kind,
-      })
-      
-      callback({ id })
-    } catch (error) {
-      console.error('produce error:', error)
-      callback({ error: error.message })
-    }
-  })
-
-  // Consume (receive media from server)
-  socket.on('consume', async ({ roomId, transportId, producerId, rtpCapabilities }, callback) => {
-    try {
-      const consumer = await mediasoupServer.consume(roomId, socket.id, transportId, producerId, rtpCapabilities)
-      callback({ consumer })
-    } catch (error) {
-      console.error('consume error:', error)
-      callback({ error: error.message })
-    }
-  })
-
-  // Resume consumer
-  socket.on('resumeConsumer', async ({ roomId, consumerId }, callback) => {
-    try {
-      await mediasoupServer.resumeConsumer(roomId, consumerId)
-      callback({ success: true })
-    } catch (error) {
-      console.error('resumeConsumer error:', error)
-      callback({ error: error.message })
-    }
-  })
-
-  // Pause consumer
-  socket.on('pauseConsumer', async ({ roomId, consumerId }, callback) => {
-    try {
-      await mediasoupServer.pauseConsumer(roomId, consumerId)
-      callback({ success: true })
-    } catch (error) {
-      console.error('pauseConsumer error:', error)
-      callback({ error: error.message })
-    }
-  })
-
-  // Close producer
-  socket.on('closeProducer', async ({ roomId, producerId }, callback) => {
-    try {
-      await mediasoupServer.closeProducer(roomId, producerId)
-      socket.to(roomId).emit('producerClosed', { producerId })
-      callback({ success: true })
-    } catch (error) {
-      console.error('closeProducer error:', error)
-      callback({ error: error.message })
-    }
-  })
-
-  // Get existing producers (when joining)
-  socket.on('getProducers', ({ roomId }, callback) => {
-    try {
-      const producers = mediasoupServer.getProducers(roomId, socket.id)
-      
-      // Get room to fetch peer names
-      const room = rooms.get(roomId)
-      const producersWithNames = producers.map(p => ({
-        ...p,
-        peerName: room?.participants.get(p.peerId)?.name || 'Unknown',
-      }))
-      
-      callback({ producers: producersWithNames })
-    } catch (error) {
-      console.error('getProducers error:', error)
-      callback({ error: error.message })
-    }
   })
 
   // ─── REAL-TIME CHAT ─────────────────────────
@@ -995,13 +909,6 @@ io.on('connection', (socket) => {
       const room = rooms.get(meetingId)
       room.participants.delete(socket.id)
 
-      // Clean up Mediasoup resources
-      try {
-        mediasoupServer.cleanupPeer(meetingId, socket.id)
-      } catch (error) {
-        console.error('Mediasoup cleanup error:', error)
-      }
-
       socket.to(meetingId).emit('user-left', { id: socket.id })
 
       // Broadcast updated participant list
@@ -1035,42 +942,10 @@ io.on('connection', (socket) => {
 })
 
 // Start server
-httpServer.listen(PORT, async () => {
+httpServer.listen(PORT, () => {
   console.log(`\n🚀 StudyHub Backend running on http://localhost:${PORT}`)
-  
-  // Get and log public IP for Mediasoup configuration
-  try {
-    const https = await import('https')
-    https.get('https://api.ipify.org?format=json', (res) => {
-      let data = ''
-      res.on('data', (chunk) => { data += chunk })
-      res.on('end', () => {
-        try {
-          const ip = JSON.parse(data).ip
-          console.log(`\n📡 Public IP Address: ${ip}`)
-          console.log(`⚙️  Set this in Render environment variables:`)
-          console.log(`   MEDIASOUP_ANNOUNCED_IP=${ip}\n`)
-        } catch (e) {
-          console.log('⚠️  Could not detect public IP')
-        }
-      })
-    }).on('error', () => {
-      console.log('⚠️  Could not detect public IP')
-    })
-  } catch (error) {
-    console.log('⚠️  Could not detect public IP')
-  }
-  
-  // Initialize Mediasoup SFU
-  try {
-    await mediasoupServer.initializeMediasoup()
-    console.log('🎬 Mediasoup SFU ready')
-  } catch (error) {
-    console.error('❌ Failed to initialize Mediasoup:', error)
-  }
-  
   console.log(`📹 WebRTC Signaling Server active`)
-  console.log(`💬 Real-Time Chat active`)
+  console.log(`� Real-Time Chat active`)
   console.log(`📋 Real-Time Tasks active`)
   console.log(`📝 Real-Time Notes active`)
   console.log(`📁 Real-Time Resources active`)

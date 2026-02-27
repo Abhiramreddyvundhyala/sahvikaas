@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../lib/auth'
+import { listMeetings, getAchievementStats } from '../../lib/api'
 
 export default function ProfilePage() {
-  const { user, updateProfile, logout, getMyRooms } = useAuth()
+  const { user, updateProfile, logout } = useAuth()
   const navigate = useNavigate()
 
   const [editing, setEditing] = useState(false)
@@ -15,28 +16,47 @@ export default function ProfilePage() {
   })
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [myRooms, setMyRooms] = useState([])
+  const [stats, setStats] = useState({ totalStudyHours: 0, totalXP: 0, currentStreak: 0 })
 
-  const myRooms = getMyRooms()
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      const [roomsRes, statsRes] = await Promise.all([
+        listMeetings().catch(() => null),
+        getAchievementStats().catch(() => null),
+      ])
+      if (!mounted) return
+      if (roomsRes?.rooms) setMyRooms(roomsRes.rooms)
+      if (statsRes?.ok) setStats(statsRes.stats || stats)
+    }
+    load()
+    return () => { mounted = false }
+  }, [])
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setError('')
     if (!form.name.trim()) {
       setError('Name is required.')
       return
     }
-    const result = updateProfile({
-      name: form.name.trim(),
-      bio: form.bio.trim(),
-      institution: form.institution.trim(),
-      major: form.major.trim(),
-    })
-    if (!result.ok) {
-      setError(result.error)
-      return
+    try {
+      const result = await updateProfile({
+        name: form.name.trim(),
+        bio: form.bio.trim(),
+        institution: form.institution.trim(),
+        major: form.major.trim(),
+      })
+      if (!result.ok) {
+        setError(result.error || 'Failed to save profile.')
+        return
+      }
+      setSaved(true)
+      setEditing(false)
+      setTimeout(() => setSaved(false), 3000)
+    } catch {
+      setError('Something went wrong. Please try again.')
     }
-    setSaved(true)
-    setEditing(false)
-    setTimeout(() => setSaved(false), 3000)
   }
 
   const handleLogout = () => {
@@ -191,8 +211,8 @@ export default function ProfilePage() {
         {[
           { label: 'Rooms Created', value: myRooms.length, icon: 'ri-video-chat-line', color: 'text-indigo-600 bg-indigo-50' },
           { label: 'Member Since', value: new Date(user.joinedAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), icon: 'ri-calendar-line', color: 'text-green-600 bg-green-50' },
-          { label: 'Study Hours', value: '—', icon: 'ri-time-line', color: 'text-orange-600 bg-orange-50' },
-          { label: 'Achievements', value: '—', icon: 'ri-trophy-line', color: 'text-purple-600 bg-purple-50' },
+          { label: 'Study Hours', value: stats.totalStudyHours || 0, icon: 'ri-time-line', color: 'text-orange-600 bg-orange-50' },
+          { label: 'Total XP', value: (stats.totalXP || 0).toLocaleString(), icon: 'ri-trophy-line', color: 'text-purple-600 bg-purple-50' },
         ].map(stat => (
           <div key={stat.label} className="bg-white border border-gray-200 rounded-lg p-4 text-center">
             <div className={`w-10 h-10 rounded-lg ${stat.color} flex items-center justify-center mx-auto mb-2`}>
