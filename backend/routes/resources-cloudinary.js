@@ -11,11 +11,24 @@ const router = express.Router()
 // File upload endpoint with Cloudinary
 router.post('/upload', authMiddleware, upload.single('file'), (req, res) => {
   try {
+    console.log('Upload request received:', {
+      hasFile: !!req.file,
+      user: req.user?.name,
+      userId: req.user?._id
+    })
+    
     if (!req.file) {
+      console.error('No file in request')
       return res.status(400).json({ error: 'No file uploaded' })
     }
     
-    console.log('File uploaded successfully:', req.file)
+    console.log('File uploaded successfully:', {
+      filename: req.file.filename,
+      originalname: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      path: req.file.path
+    })
     
     // Cloudinary provides the URL directly
     const fileUrl = req.file.path // Cloudinary URL
@@ -30,19 +43,43 @@ router.post('/upload', authMiddleware, upload.single('file'), (req, res) => {
       originalName: req.file.originalname,
     })
   } catch (err) {
-    console.error('Upload error:', err)
-    res.status(500).json({ error: 'File upload failed: ' + err.message })
+    console.error('Upload error details:', {
+      message: err.message,
+      stack: err.stack,
+      name: err.name
+    })
+    res.status(500).json({ 
+      error: 'File upload failed',
+      details: err.message,
+      cloudinaryConfigured: !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY)
+    })
   }
 })
 
 // Handle multer errors
 router.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    console.error('Multer error:', err)
-    return res.status(400).json({ error: err.message })
+    console.error('Multer error:', {
+      code: err.code,
+      message: err.message,
+      field: err.field
+    })
+    return res.status(400).json({ 
+      error: err.message,
+      code: err.code,
+      type: 'MulterError'
+    })
   } else if (err) {
-    console.error('Upload error:', err)
-    return res.status(500).json({ error: err.message || 'Upload failed' })
+    console.error('Upload middleware error:', {
+      message: err.message,
+      stack: err.stack,
+      name: err.name
+    })
+    return res.status(500).json({ 
+      error: err.message || 'Upload failed',
+      type: err.name || 'UnknownError',
+      cloudinaryConfigured: !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY)
+    })
   }
   next()
 })

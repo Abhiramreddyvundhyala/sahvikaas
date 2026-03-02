@@ -9,6 +9,22 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 })
 
+// Verify Cloudinary configuration
+const cloudinaryConfigured = !!(
+  process.env.CLOUDINARY_CLOUD_NAME && 
+  process.env.CLOUDINARY_API_KEY && 
+  process.env.CLOUDINARY_API_SECRET
+)
+
+if (!cloudinaryConfigured) {
+  console.error('⚠️  CLOUDINARY NOT CONFIGURED - Missing environment variables:')
+  if (!process.env.CLOUDINARY_CLOUD_NAME) console.error('   - CLOUDINARY_CLOUD_NAME')
+  if (!process.env.CLOUDINARY_API_KEY) console.error('   - CLOUDINARY_API_KEY')
+  if (!process.env.CLOUDINARY_API_SECRET) console.error('   - CLOUDINARY_API_SECRET')
+} else {
+  console.log('✅ Cloudinary configured:', process.env.CLOUDINARY_CLOUD_NAME)
+}
+
 // Configure Cloudinary storage for multer
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,

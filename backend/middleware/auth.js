@@ -12,6 +12,7 @@ export async function authMiddleware(req, res, next) {
   try {
     const authHeader = req.headers.authorization
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('Auth failed: No authorization header')
       return res.status(401).json({ error: 'Authentication required' })
     }
 
@@ -20,15 +21,28 @@ export async function authMiddleware(req, res, next) {
 
     const user = await User.findById(decoded.id).select('-password')
     if (!user) {
+      console.log('Auth failed: User not found for ID:', decoded.id)
       return res.status(401).json({ error: 'User not found' })
     }
 
     req.user = user
     next()
   } catch (err) {
+    console.error('Auth middleware error:', {
+      name: err.name,
+      message: err.message
+    })
+    
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Token expired' })
     }
-    return res.status(401).json({ error: 'Invalid token' })
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid token' })
+    }
+    // Database or other errors
+    return res.status(500).json({ 
+      error: 'Authentication error',
+      details: err.message 
+    })
   }
 }
