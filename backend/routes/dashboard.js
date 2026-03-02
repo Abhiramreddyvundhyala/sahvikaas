@@ -15,8 +15,8 @@ router.get('/summary', authMiddleware, async (req, res) => {
     // Active rooms created by user - fetched from in-memory rooms via query param
     // (Rooms are still in-memory for the real-time collaboration; this just shows user stats)
 
-    // Recent resources (last 5 uploaded by anyone)
-    const recentResources = await Resource.find({}).sort({ createdAt: -1 }).limit(5)
+    // Recent resources (last 5 uploaded by user, not everyone)
+    const recentResources = await Resource.find({ userId }).sort({ createdAt: -1 }).limit(5)
 
     // Upcoming sessions (user-specific)
     const today = new Date().toISOString().split('T')[0]

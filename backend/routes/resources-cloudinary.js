@@ -1,45 +1,24 @@
 import express from 'express'
+import jwt from 'jsonwebtoken'
 import multer from 'multer'
-import path from 'path'
+import { upload } from '../config/cloudinary.js'
 import { authMiddleware } from '../middleware/auth.js'
 import Resource, { Folder } from '../models/Resource.js'
+import User from '../models/User.js'
 
 const router = express.Router()
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'backend/uploads/')
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-    cb(null, uniqueSuffix + path.extname(file.originalname))
-  }
-})
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /pdf|doc|docx|ppt|pptx|mp4|jpg|jpeg|png|zip/
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase())
-    const mimetype = allowedTypes.test(file.mimetype)
-    if (extname && mimetype) {
-      cb(null, true)
-    } else {
-      cb(new Error('Invalid file type'))
-    }
-  }
-})
-
-// File upload endpoint
+// File upload endpoint with Cloudinary
 router.post('/upload', authMiddleware, upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' })
     }
     
-    const fileUrl = `/uploads/${req.file.filename}`
+    console.log('File uploaded successfully:', req.file)
+    
+    // Cloudinary provides the URL directly
+    const fileUrl = req.file.path // Cloudinary URL
     const sizeInMB = (req.file.size / 1024 / 1024).toFixed(2)
     const size = `${sizeInMB} MB`
     
@@ -51,7 +30,91 @@ router.post('/upload', authMiddleware, upload.single('file'), (req, res) => {
       originalName: req.file.originalname,
     })
   } catch (err) {
-    res.status(500).json({ error: 'File upload failed' })
+    console.error('Upload error:', err)
+    res.status(500).json({ error: 'File upload failed: ' + err.message })
+  }
+})
+
+// Handle multer errors
+router.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    console.error('Multer error:', err)
+    return res.status(400).json({ error: err.message })
+  } else if (err) {
+    console.error('Upload error:', err)
+    return res.status(500).json({ error: err.message || 'Upload failed' })
+  }
+  next()
+})
+
+// Proxy endpoint to serve files with inline content-disposition
+router.get('/view/:resourceId', async (req, res) => {
+  try {
+    // Get token from query parameter (since it's a new window)
+    const token = req.query.token
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'studyhub-secret-key-change-in-production')
+    const user = await User.findById(decoded.id)
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid token' })
+    }
+
+    const resource = await Resource.findOne({ 
+      _id: req.params.resourceId, 
+      userId: user._id 
+    })
+    
+    if (!resource) {
+      return res.status(404).send('Resource not found')
+    }
+
+    if (!resource.fileUrl) {
+      return res.status(404).send('File URL not found')
+    }
+
+    // Fetch file from Cloudinary
+    const response = await fetch(resource.fileUrl)
+    
+    if (!response.ok) {
+      return res.status(404).send('File not found in storage')
+    }
+
+    // Determine content type based on file extension
+    let contentType = 'application/octet-stream'
+    const ext = resource.title.split('.').pop().toLowerCase()
+    
+    const contentTypes = {
+      'pdf': 'application/pdf',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'mp4': 'video/mp4',
+      'doc': 'application/msword',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'ppt': 'application/vnd.ms-powerpoint',
+      'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    }
+    
+    contentType = contentTypes[ext] || contentType
+    
+    // IMPORTANT: Set headers BEFORE sending data
+    res.setHeader('Content-Type', contentType)
+    res.setHeader('Content-Disposition', 'inline')
+    res.setHeader('Cache-Control', 'public, max-age=31536000')
+    
+    // Stream the file
+    const buffer = await response.arrayBuffer()
+    res.send(Buffer.from(buffer))
+  } catch (err) {
+    console.error('View error:', err)
+    res.status(500).send('Failed to load file')
   }
 })
 

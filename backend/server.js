@@ -17,7 +17,7 @@ import Room from './models/Room.js'
 // Route imports
 import authRoutes from './routes/auth.js'
 import scheduleRoutes from './routes/schedule.js'
-import resourceRoutes from './routes/resources.js'
+import resourceRoutes from './routes/resources-cloudinary.js'
 import aiRoutes from './routes/ai.js'
 import achievementRoutes from './routes/achievements.js'
 import dashboardRoutes from './routes/dashboard.js'
@@ -170,6 +170,9 @@ function getIceConfig() {
 // Middleware
 app.use(cors())
 app.use(express.json({ limit: '50mb' }))
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
 // ─── API Routes (MongoDB-backed) ───
 

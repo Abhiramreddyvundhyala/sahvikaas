@@ -1,295 +1,744 @@
-import { useState, useEffect, useMemo } from 'react'
-import { getResources, getFeaturedResources, downloadResource } from '../../lib/api'
+import { useState, useEffect } from 'react'
+import { useAuth } from '../../lib/auth'
+import { getToken } from '../../lib/api'
 
-// ─── Resource Categories ───
-const resourceCategories = [
-  { id: 'all', label: 'All Resources', icon: 'ri-folder-line' },
-  { id: 'notes', label: 'Notes', icon: 'ri-sticky-note-line' },
-  { id: 'presentations', label: 'Presentations', icon: 'ri-slideshow-3-line' },
-  { id: 'practice', label: 'Practice Sets', icon: 'ri-pencil-ruler-2-line' },
-  { id: 'videos', label: 'Videos', icon: 'ri-video-line' },
-  { id: 'papers', label: 'Question Papers', icon: 'ri-file-list-3-line' },
-  { id: 'lab', label: 'Lab Manuals', icon: 'ri-test-tube-line' },
-  { id: 'ebooks', label: 'E-Books', icon: 'ri-book-2-line' },
-  { id: 'cheatsheets', label: 'Cheat Sheets', icon: 'ri-flashlight-line' },
-  { id: 'mindmaps', label: 'Mind Maps', icon: 'ri-mind-map' },
+// ─── API Functions ───
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+
+async function apiRequest(endpoint, options = {}) {
+  const token = getToken()
+  const headers = { 'Content-Type': 'application/json' }
+  if (token) headers.Authorization = `Bearer ${token}`
+  
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    headers: { ...headers, ...options.headers },
+  })
+  return res.json()
+}
+
+const resourceApi = {
+  getLibrary: (params) => {
+    const query = new URLSearchParams(params).toString()
+    return apiRequest(`/api/resources/user/library?${query}`)
+  },
+  createResource: (data) => apiRequest('/api/resources/user/library', { method: 'POST', body: JSON.stringify(data) }),
+  updateResource: (id, data) => apiRequest(`/api/resources/user/library/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteResource: (id) => apiRequest(`/api/resources/user/library/${id}`, { method: 'DELETE' }),
+  moveResources: (resourceIds, folderId) => apiRequest('/api/resources/user/library/move', { method: 'POST', body: JSON.stringify({ resourceIds, folderId }) }),
+  
+  getFolders: (parentId) => {
+    const query = parentId ? `?parentId=${parentId}` : ''
+    return apiRequest(`/api/resources/user/folders${query}`)
+  },
+  createFolder: (data) => apiRequest('/api/resources/user/folders', { method: 'POST', body: JSON.stringify(data) }),
+  updateFolder: (id, data) => apiRequest(`/api/resources/user/folders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteFolder: (id) => apiRequest(`/api/resources/user/folders/${id}`, { method: 'DELETE' }),
+}
+
+// ─── Constants ───
+const VIEW_MODES = {
+  GRID: 'grid',
+  LIST: 'list',
+  COMPACT: 'compact',
+}
+
+const RESOURCE_TYPES = [
+  { value: 'PDF', icon: 'ri-file-pdf-2-line', color: 'text-red-500 bg-red-50' },
+  { value: 'DOC', icon: 'ri-file-word-2-line', color: 'text-blue-500 bg-blue-50' },
+  { value: 'PPT', icon: 'ri-slideshow-3-line', color: 'text-orange-500 bg-orange-50' },
+  { value: 'VIDEO', icon: 'ri-video-line', color: 'text-purple-500 bg-purple-50' },
+  { value: 'LINK', icon: 'ri-link', color: 'text-green-500 bg-green-50' },
+  { value: 'IMAGE', icon: 'ri-image-line', color: 'text-pink-500 bg-pink-50' },
+  { value: 'CODE', icon: 'ri-code-line', color: 'text-gray-700 bg-gray-100' },
+  { value: 'OTHER', icon: 'ri-file-line', color: 'text-gray-500 bg-gray-50' },
 ]
 
-const semesters = ['All', 'Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6', 'Sem 7', 'Sem 8']
-const subjects = ['All', 'Data Structures', 'Algorithms', 'Database Systems', 'Computer Networks', 'Operating Systems', 'Machine Learning', 'Web Development', 'Mathematics', 'Physics']
-const sortOptions = ['Newest', 'Most Downloaded', 'Highest Rated']
+const FOLDER_COLORS = [
+  '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316',
+  '#eab308', '#22c55e', '#10b981', '#14b8a6', '#06b6d4',
+  '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
+]
 
-// ─── Star Rating Component ───
-function StarRating({ rating }) {
-  return (
-    <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map(star => (
-        <i
-          key={star}
-          className={`text-xs ${star <= Math.round(rating) ? 'ri-star-fill text-yellow-400' : 'ri-star-line text-gray-300'}`}
-        />
-      ))}
-      <span className="text-xs text-gray-500 ml-1">{rating}</span>
-    </div>
-  )
-}
-
-// ─── Resource Card ───
-function ResourceCard({ resource, onPreview }) {
-  return (
-    <div className="group bg-white rounded-xl border border-gray-200 hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 overflow-hidden">
-      <div className="p-4 sm:p-5">
-        <div className="flex items-start gap-3">
-          <div className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${resource.iconColor}`}>
-            <i className={`${resource.icon} text-xl`} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-gray-900 text-sm truncate group-hover:text-indigo-600 transition-colors">{resource.title}</h3>
-            <p className="text-xs text-gray-500 mt-0.5">{resource.subject}</p>
-          </div>
-        </div>
-
-        {/* Meta tags */}
-        <div className="flex flex-wrap gap-1.5 mt-3">
-          <span className="text-xs px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full font-medium">{resource.semester}</span>
-          <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{resource.type}</span>
-          {resource.size !== '-' && (
-            <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{resource.size}</span>
-          )}
-        </div>
-
-        {/* Rating & Downloads */}
-        <div className="flex items-center justify-between mt-3">
-          <StarRating rating={resource.rating} />
-          <div className="flex items-center gap-1 text-xs text-gray-500">
-            <i className="ri-download-2-line" />
-            {resource.downloads.toLocaleString()}
-          </div>
-        </div>
-
-        {/* Contributor */}
-        <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-gray-100">
-          <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center">
-            <span className="text-[10px] font-bold text-indigo-600">{resource.contributor.charAt(0)}</span>
-          </div>
-          <span className="text-xs text-gray-500">by {resource.contributor}</span>
-          <span className="text-xs text-gray-400 ml-auto">{new Date(resource.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex border-t border-gray-100">
-        <button
-          onClick={() => onPreview(resource)}
-          className="flex-1 py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
-        >
-          <i className="ri-eye-line" />
-          Preview
-        </button>
-        <div className="w-px bg-gray-100" />
-        <button className="flex-1 py-2.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-1.5">
-          <i className="ri-download-2-line" />
-          Download
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Upload Modal ───
-function UploadModal({ onClose }) {
+// ─── Create/Edit Resource Modal ───
+function ResourceModal({ resource, folderId, onClose, onSave }) {
+  const [formData, setFormData] = useState({
+    title: resource?.title || '',
+    type: resource?.type || 'PDF',
+    tags: resource?.tags?.join(', ') || '',
+  })
+  const [file, setFile] = useState(null)
   const [dragOver, setDragOver] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  const selectedType = RESOURCE_TYPES.find(t => t.value === formData.type) || RESOURCE_TYPES[0]
+
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files?.[0]
+    if (selectedFile) {
+      setFile(selectedFile)
+      if (!formData.title) {
+        setFormData({ ...formData, title: selectedFile.name })
+      }
+    }
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    setDragOver(false)
+    const droppedFile = e.dataTransfer.files?.[0]
+    if (droppedFile) {
+      setFile(droppedFile)
+      if (!formData.title) {
+        setFormData({ ...formData, title: droppedFile.name })
+      }
+    }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!resource && !file) {
+      alert('Please select a file to upload')
+      return
+    }
+
+    setLoading(true)
+    try {
+      let fileUrl = resource?.fileUrl || ''
+      let size = resource?.size || ''
+
+      // If new file, upload it
+      if (file) {
+        const token = getToken()
+        if (!token) {
+          throw new Error('Not logged in. Please login first.')
+        }
+
+        const uploadFormData = new FormData()
+        uploadFormData.append('file', file)
+        
+        const uploadRes = await fetch(`${API_BASE}/api/resources/upload`, {
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${token}`
+          },
+          body: uploadFormData,
+        })
+        
+        if (!uploadRes.ok) {
+          const errorText = await uploadRes.text()
+          console.error('Upload error:', uploadRes.status, errorText)
+          throw new Error(`Upload failed: ${uploadRes.status} ${uploadRes.statusText}`)
+        }
+
+        const uploadData = await uploadRes.json()
+        if (uploadData.ok) {
+          fileUrl = uploadData.fileUrl
+          size = uploadData.size
+        } else {
+          throw new Error(uploadData.error || 'Upload failed')
+        }
+      }
+
+      const data = {
+        title: formData.title,
+        type: formData.type,
+        tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean),
+        fileUrl,
+        size,
+        icon: selectedType.icon,
+        iconColor: selectedType.color,
+        folderId: folderId || null,
+      }
+      
+      if (resource) {
+        await resourceApi.updateResource(resource._id, data)
+      } else {
+        await resourceApi.createResource(data)
+      }
+      onSave()
+    } catch (err) {
+      console.error('Save error:', err)
+      alert('Failed to save resource: ' + err.message)
+    }
+    setLoading(false)
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-5 border-b border-gray-200">
-          <h3 className="font-semibold text-gray-900">Upload Resource</h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors">
-            <i className="ri-close-line text-gray-500" />
-          </button>
-        </div>
-        <div className="p-5 space-y-4">
-          {/* Title */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">Title</label>
-            <input type="text" placeholder="e.g. Data Structures Notes" className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
-          </div>
-          {/* Subject & Semester */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">Subject</label>
-              <select className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white">
-                {subjects.filter(s => s !== 'All').map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">Semester</label>
-              <select className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white">
-                {semesters.filter(s => s !== 'All').map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-          </div>
-          {/* Category */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">Category</label>
-            <select className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white">
-              {resourceCategories.filter(c => c.id !== 'all').map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-            </select>
-          </div>
-          {/* File Upload */}
-          <div
-            className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${dragOver ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}
-            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={e => { e.preventDefault(); setDragOver(false) }}
-          >
-            <i className="ri-upload-cloud-2-line text-3xl text-gray-400" />
-            <p className="text-sm text-gray-600 mt-2">Drag & drop your file here, or <span className="text-indigo-600 font-medium cursor-pointer">browse</span></p>
-            <p className="text-xs text-gray-400 mt-1">PDF, PPT, DOC, MP4 up to 50MB</p>
-          </div>
-          {/* Submit */}
-          <button className="w-full py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
-            Upload Resource
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Preview Modal ───
-function PreviewModal({ resource, onClose }) {
-  if (!resource) return null
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="p-5 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-900">Resource Preview</h3>
+        <div className="border-b border-gray-200 p-5 flex items-center justify-between">
+          <h3 className="font-semibold text-gray-900">{resource ? 'Edit Resource' : 'Upload Resource'}</h3>
           <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center">
             <i className="ri-close-line text-gray-500" />
           </button>
         </div>
-        <div className="p-5 space-y-4">
-          <div className="flex items-center gap-3">
-            <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${resource.iconColor}`}>
-              <i className={`${resource.icon} text-2xl`} />
+        
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {!resource && (
+            <div
+              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
+                dragOver ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-gray-400'
+              }`}
+              onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              onClick={() => document.getElementById('file-input').click()}
+            >
+              <input
+                id="file-input"
+                type="file"
+                onChange={handleFileChange}
+                className="hidden"
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.mp4,.jpg,.jpeg,.png,.zip"
+              />
+              {file ? (
+                <div className="flex items-center justify-center gap-3">
+                  <div className="w-12 h-12 rounded-lg bg-indigo-50 flex items-center justify-center">
+                    <i className="ri-file-line text-2xl text-indigo-600" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-gray-900">{file.name}</p>
+                    <p className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <i className="ri-upload-cloud-2-line text-4xl text-gray-400" />
+                  <p className="text-sm text-gray-600 mt-3">
+                    <span className="text-indigo-600 font-medium">Click to upload</span> or drag and drop
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">PDF, DOC, PPT, VIDEO, IMAGE (max 50MB)</p>
+                </>
+              )}
             </div>
-            <div>
-              <h4 className="font-semibold text-gray-900">{resource.title}</h4>
-              <p className="text-sm text-gray-500">{resource.subject}</p>
+          )}
+
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">Title *</label>
+            <input
+              type="text"
+              required
+              value={formData.title}
+              onChange={e => setFormData({ ...formData, title: e.target.value })}
+              placeholder="Resource name"
+              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">Type</label>
+            <select
+              value={formData.type}
+              onChange={e => setFormData({ ...formData, type: e.target.value })}
+              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 bg-white"
+            >
+              {RESOURCE_TYPES.map(t => (
+                <option key={t.value} value={t.value}>{t.value}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">Tags (optional)</label>
+            <input
+              type="text"
+              value={formData.tags}
+              onChange={e => setFormData({ ...formData, tags: e.target.value })}
+              placeholder="e.g. important, exam, chapter-5"
+              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">Separate tags with commas</p>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 border border-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <i className="ri-upload-2-line" />
+                  {resource ? 'Update' : 'Upload'}
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── Create/Edit Folder Modal ───
+function FolderModal({ folder, onClose, onSave }) {
+  const [formData, setFormData] = useState({
+    name: folder?.name || '',
+    color: folder?.color || FOLDER_COLORS[0],
+    icon: folder?.icon || 'ri-folder-line',
+    description: folder?.description || '',
+  })
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    try {
+      if (folder) {
+        await resourceApi.updateFolder(folder._id, formData)
+      } else {
+        await resourceApi.createFolder(formData)
+      }
+      onSave()
+    } catch (err) {
+      alert('Failed to save folder')
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="border-b border-gray-200 p-5 flex items-center justify-between">
+          <h3 className="font-semibold text-gray-900">{folder ? 'Edit Folder' : 'New Folder'}</h3>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center">
+            <i className="ri-close-line text-gray-500" />
+          </button>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">Folder Name *</label>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              onChange={e => setFormData({ ...formData, name: e.target.value })}
+              placeholder="e.g. Semester 5"
+              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-2">Color</label>
+            <div className="flex flex-wrap gap-2">
+              {FOLDER_COLORS.map(color => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, color })}
+                  className={`w-8 h-8 rounded-lg transition-all ${formData.color === color ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: 'Type', value: resource.type },
-              { label: 'Size', value: resource.size },
-              { label: 'Downloads', value: resource.downloads.toLocaleString() },
-              { label: 'Rating', value: `${resource.rating}/5` },
-              { label: 'Semester', value: resource.semester },
-              { label: 'Contributor', value: resource.contributor },
-            ].map(item => (
-              <div key={item.label} className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-500">{item.label}</p>
-                <p className="text-sm font-medium text-gray-900">{item.value}</p>
-              </div>
-            ))}
+
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">Description</label>
+            <textarea
+              value={formData.description}
+              onChange={e => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Optional description..."
+              rows={2}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 resize-none"
+            />
           </div>
+
           <div className="flex gap-3">
-            <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors text-gray-700">
-              Close
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 border border-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50"
+            >
+              Cancel
             </button>
-            <button className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2">
-              <i className="ri-download-2-line" />
-              Download
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {loading ? 'Saving...' : folder ? 'Update' : 'Create'}
             </button>
           </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── Resource Card Components ───
+function ResourceGridCard({ resource, onEdit, onDelete, onToggleFavorite, onOpen }) {
+  const typeInfo = RESOURCE_TYPES.find(t => t.value === resource.type) || RESOURCE_TYPES[0]
+  
+  return (
+    <div className="group bg-white rounded-xl border border-gray-200 hover:shadow-lg transition-all duration-300 overflow-hidden">
+      <div className="p-4">
+        <div className="flex items-start gap-3">
+          <div className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${resource.iconColor || typeInfo.color}`}>
+            <i className={`${resource.icon || typeInfo.icon} text-xl`} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-gray-900 text-sm truncate group-hover:text-indigo-600 transition-colors">
+              {resource.title}
+            </h3>
+            {resource.subject && <p className="text-xs text-gray-500 mt-0.5">{resource.subject}</p>}
+          </div>
+          <button
+            onClick={() => onToggleFavorite(resource)}
+            className="shrink-0 w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center"
+          >
+            <i className={`${resource.isFavorite ? 'ri-star-fill text-yellow-400' : 'ri-star-line text-gray-400'}`} />
+          </button>
+        </div>
+
+        {resource.tags && resource.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {resource.tags.slice(0, 3).map((tag, i) => (
+              <span key={i} className="text-xs px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full">
+                {tag}
+              </span>
+            ))}
+            {resource.tags.length > 3 && (
+              <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+                +{resource.tags.length - 3}
+              </span>
+            )}
+          </div>
+        )}
+
+        {resource.notes && (
+          <p className="text-xs text-gray-500 mt-2 line-clamp-2">{resource.notes}</p>
+        )}
+
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
+          <span>{resource.type}</span>
+          {resource.size && <span>• {resource.size}</span>}
+          <span className="ml-auto">{new Date(resource.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
         </div>
       </div>
-    </div>
-  )
-}
 
-// ─── Semester Quick Access ───
-function SemesterQuickAccess({ onSelect, allResources }) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5">
-      <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-        <i className="ri-folder-open-line text-indigo-500" />
-        Quick Access by Semester
-      </h3>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {semesters.filter(s => s !== 'All').map(sem => {
-          const count = allResources.filter(r => r.semester === sem).length
-          return (
-            <button
-              key={sem}
-              onClick={() => onSelect(sem)}
-              className="flex items-center gap-2 p-3 rounded-lg bg-gray-50 hover:bg-indigo-50 hover:text-indigo-600 transition-colors group"
-            >
-              <i className="ri-folder-3-line text-gray-400 group-hover:text-indigo-500 transition-colors" />
-              <div className="text-left">
-                <p className="text-sm font-medium text-gray-900 group-hover:text-indigo-600 transition-colors">{sem}</p>
-                <p className="text-xs text-gray-500">{count} resources</p>
-              </div>
-            </button>
-          )
-        })}
+      <div className="flex border-t border-gray-100">
+        <button
+          onClick={() => onOpen(resource)}
+          className="flex-1 py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
+        >
+          <i className="ri-external-link-line" />
+          Open
+        </button>
+        <div className="w-px bg-gray-100" />
+        <button
+          onClick={() => onEdit(resource)}
+          className="flex-1 py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
+        >
+          <i className="ri-edit-line" />
+          Edit
+        </button>
+        <div className="w-px bg-gray-100" />
+        <button
+          onClick={() => onDelete(resource)}
+          className="flex-1 py-2.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors flex items-center justify-center gap-1.5"
+        >
+          <i className="ri-delete-bin-line" />
+          Delete
+        </button>
       </div>
     </div>
   )
 }
 
-// ─── Main Page ───
+function ResourceListItem({ resource, onEdit, onDelete, onToggleFavorite, onOpen }) {
+  const typeInfo = RESOURCE_TYPES.find(t => t.value === resource.type) || RESOURCE_TYPES[0]
+  
+  return (
+    <div className="group bg-white border border-gray-200 rounded-lg hover:shadow-md transition-all p-4 flex items-center gap-4">
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${resource.iconColor || typeInfo.color}`}>
+        <i className={`${resource.icon || typeInfo.icon} text-lg`} />
+      </div>
+      
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-gray-900 text-sm truncate">{resource.title}</h3>
+          {resource.isFavorite && <i className="ri-star-fill text-yellow-400 text-xs" />}
+        </div>
+        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+          {resource.subject && <span>{resource.subject}</span>}
+          <span>• {resource.type}</span>
+          {resource.size && <span>• {resource.size}</span>}
+          <span>• {new Date(resource.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+        </div>
+        {resource.tags && resource.tags.length > 0 && (
+          <div className="flex gap-1 mt-2">
+            {resource.tags.slice(0, 5).map((tag, i) => (
+              <span key={i} className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-1 shrink-0">
+        <button
+          onClick={() => onToggleFavorite(resource)}
+          className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center"
+          title="Toggle favorite"
+        >
+          <i className={`${resource.isFavorite ? 'ri-star-fill text-yellow-400' : 'ri-star-line text-gray-400'}`} />
+        </button>
+        <button
+          onClick={() => onOpen(resource)}
+          className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center"
+          title="Open"
+        >
+          <i className="ri-external-link-line text-gray-600" />
+        </button>
+        <button
+          onClick={() => onEdit(resource)}
+          className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center"
+          title="Edit"
+        >
+          <i className="ri-edit-line text-gray-600" />
+        </button>
+        <button
+          onClick={() => onDelete(resource)}
+          className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center"
+          title="Delete"
+        >
+          <i className="ri-delete-bin-line text-red-600" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function FolderCard({ folder, onOpen, onEdit, onDelete, resourceCount }) {
+  return (
+    <div
+      onClick={() => onOpen(folder)}
+      className="group bg-white rounded-xl border border-gray-200 hover:shadow-lg transition-all duration-300 p-4 cursor-pointer"
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0"
+          style={{ backgroundColor: `${folder.color}20`, color: folder.color }}
+        >
+          <i className={`${folder.icon} text-xl`} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-gray-900 text-sm truncate group-hover:text-indigo-600 transition-colors">
+            {folder.name}
+          </h3>
+          <p className="text-xs text-gray-500 mt-0.5">{resourceCount} items</p>
+        </div>
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(folder) }}
+            className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center"
+          >
+            <i className="ri-edit-line text-gray-600 text-sm" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(folder) }}
+            className="w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center"
+          >
+            <i className="ri-delete-bin-line text-red-600 text-sm" />
+          </button>
+        </div>
+      </div>
+      {folder.description && (
+        <p className="text-xs text-gray-500 mt-2 line-clamp-2">{folder.description}</p>
+      )}
+    </div>
+  )
+}
+
+// ─── Main Component ───
 export default function ResourcesPage() {
-  const [activeCategory, setActiveCategory] = useState('all')
-  const [activeSemester, setActiveSemester] = useState('All')
-  const [activeSubject, setActiveSubject] = useState('All')
-  const [sortBy, setSortBy] = useState('Newest')
-  const [search, setSearch] = useState('')
-  const [showUpload, setShowUpload] = useState(false)
-  const [previewResource, setPreviewResource] = useState(null)
-  const [allResources, setAllResources] = useState([])
-  const [featuredResources, setFeaturedResources] = useState([])
+  const { user } = useAuth()
+  const [viewMode, setViewMode] = useState(VIEW_MODES.GRID)
+  const [currentFolderId, setCurrentFolderId] = useState(null)
+  const [folderPath, setFolderPath] = useState([])
+  const [folders, setFolders] = useState([])
+  const [resources, setResources] = useState([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [filterFavorites, setFilterFavorites] = useState(false)
+  const [selectedTag, setSelectedTag] = useState(null)
+  
+  const [showResourceModal, setShowResourceModal] = useState(false)
+  const [showFolderModal, setShowFolderModal] = useState(false)
+  const [editingResource, setEditingResource] = useState(null)
+  const [editingFolder, setEditingFolder] = useState(null)
+
+  // Load data
+  const loadData = async () => {
+    if (!user) {
+      setLoading(false)
+      return
+    }
+    
+    setLoading(true)
+    try {
+      const params = { folderId: currentFolderId || 'null' }
+      if (search) params.search = search
+      if (filterFavorites) params.isFavorite = 'true'
+      if (selectedTag) params.tags = selectedTag
+
+      const [foldersRes, resourcesRes] = await Promise.all([
+        resourceApi.getFolders(currentFolderId || 'null'),
+        resourceApi.getLibrary(params),
+      ])
+
+      if (foldersRes.ok) setFolders(foldersRes.folders || [])
+      if (resourcesRes.ok) setResources(resourcesRes.resources || [])
+    } catch (err) {
+      console.error('Failed to load data:', err)
+    }
+    setLoading(false)
+  }
 
   useEffect(() => {
-    let mounted = true
-    const load = async () => {
-      setLoading(true)
-      try {
-        const [resAll, resFeat] = await Promise.all([
-          getResources().catch(() => null),
-          getFeaturedResources().catch(() => null),
-        ])
-        if (!mounted) return
-        if (resAll?.ok) setAllResources(resAll.resources || [])
-        if (resFeat?.ok) setFeaturedResources(resFeat.resources || [])
-      } catch { /* ignore */ }
-      if (mounted) setLoading(false)
+    loadData()
+  }, [currentFolderId, search, filterFavorites, selectedTag, user])
+
+  // Get all unique tags
+  const allTags = [...new Set(resources.flatMap(r => r.tags || []))]
+
+  // Handlers
+  const handleOpenFolder = (folder) => {
+    setCurrentFolderId(folder._id)
+    setFolderPath([...folderPath, { id: folder._id, name: folder.name }])
+  }
+
+  const handleNavigateToFolder = (index) => {
+    if (index === -1) {
+      setCurrentFolderId(null)
+      setFolderPath([])
+    } else {
+      const folder = folderPath[index]
+      setCurrentFolderId(folder.id)
+      setFolderPath(folderPath.slice(0, index + 1))
     }
-    load()
-    return () => { mounted = false }
-  }, [])
+  }
 
-  const filteredResources = useMemo(() => {
-    let results = allResources
+  const handleCreateResource = () => {
+    setEditingResource(null)
+    setShowResourceModal(true)
+  }
 
-    if (activeCategory !== 'all') results = results.filter(r => r.category === activeCategory)
-    if (activeSemester !== 'All') results = results.filter(r => r.semester === activeSemester)
-    if (activeSubject !== 'All') results = results.filter(r => r.subject === activeSubject)
-    if (search) results = results.filter(r =>
-      r.title.toLowerCase().includes(search.toLowerCase()) ||
-      r.subject.toLowerCase().includes(search.toLowerCase())
+  const handleEditResource = (resource) => {
+    setEditingResource(resource)
+    setShowResourceModal(true)
+  }
+
+  const handleDeleteResource = async (resource) => {
+    if (!confirm(`Delete "${resource.title}"?`)) return
+    try {
+      await resourceApi.deleteResource(resource._id)
+      loadData()
+    } catch (err) {
+      alert('Failed to delete resource')
+    }
+  }
+
+  const handleToggleFavorite = async (resource) => {
+    try {
+      await resourceApi.updateResource(resource._id, { isFavorite: !resource.isFavorite })
+      loadData()
+    } catch (err) {
+      alert('Failed to update favorite')
+    }
+  }
+
+  const handleOpenResource = (resource) => {
+    if (!resource.fileUrl) {
+      alert('No URL available for this resource')
+      return
+    }
+
+    const fileUrl = resource.fileUrl
+    const fileName = resource.title.toLowerCase()
+    
+    // Document formats that Google Docs Viewer can display
+    const documentFormats = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.txt']
+    const isDocument = documentFormats.some(ext => fileName.endsWith(ext))
+    
+    // Image formats
+    const imageFormats = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']
+    const isImage = imageFormats.some(ext => fileName.endsWith(ext))
+    
+    // Video formats
+    const videoFormats = ['.mp4', '.webm', '.ogg']
+    const isVideo = videoFormats.some(ext => fileName.endsWith(ext))
+
+    if (isDocument) {
+      // Use Google Docs Viewer for all document formats
+      const googleViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`
+      window.open(googleViewerUrl, '_blank')
+    } 
+    else if (isImage || isVideo) {
+      // Open images and videos directly (Cloudinary serves these inline)
+      window.open(fileUrl, '_blank')
+    }
+    else {
+      // For other formats, try Google Docs Viewer anyway
+      const googleViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`
+      window.open(googleViewerUrl, '_blank')
+    }
+  }
+
+  const handleCreateFolder = () => {
+    setEditingFolder(null)
+    setShowFolderModal(true)
+  }
+
+  const handleEditFolder = (folder) => {
+    setEditingFolder(folder)
+    setShowFolderModal(true)
+  }
+
+  const handleDeleteFolder = async (folder) => {
+    if (!confirm(`Delete folder "${folder.name}"? Resources will be moved to parent folder.`)) return
+    try {
+      await resourceApi.deleteFolder(folder._id)
+      loadData()
+    } catch (err) {
+      alert('Failed to delete folder')
+    }
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="text-center">
+          <i className="ri-lock-line text-5xl text-gray-300 mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Login Required</h2>
+          <p className="text-gray-500 mb-4">Please log in to access your resources</p>
+          <a
+            href="/auth"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            <i className="ri-login-line" />
+            Go to Login
+          </a>
+        </div>
+      </div>
     )
-
-    // Sort
-    if (sortBy === 'Most Downloaded') results = [...results].sort((a, b) => b.downloads - a.downloads)
-    else if (sortBy === 'Highest Rated') results = [...results].sort((a, b) => b.rating - a.rating)
-    else results = [...results].sort((a, b) => new Date(b.date) - new Date(a.date))
-
-    return results
-  }, [activeCategory, activeSemester, activeSubject, search, sortBy, allResources])
+  }
 
   if (loading) {
     return (
@@ -303,71 +752,54 @@ export default function ResourcesPage() {
   }
 
   return (
-    <div className="space-y-5 sm:space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Resources</h1>
-          <p className="text-sm text-gray-500 mt-1">Browse, download, and share study materials</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">My Resources</h1>
+          <p className="text-sm text-gray-500 mt-1">Organize and manage your study materials</p>
         </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleCreateFolder}
+            className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <i className="ri-folder-add-line" />
+            New Folder
+          </button>
+          <button
+            onClick={handleCreateResource}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            <i className="ri-add-line" />
+            Add Resource
+          </button>
+        </div>
+      </div>
+
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm">
         <button
-          onClick={() => setShowUpload(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors w-fit"
+          onClick={() => handleNavigateToFolder(-1)}
+          className="text-gray-600 hover:text-indigo-600 transition-colors flex items-center gap-1"
         >
-          <i className="ri-upload-2-line" />
-          Contribute
+          <i className="ri-home-4-line" />
+          Home
         </button>
-      </div>
-
-      {/* Featured Resources Carousel */}
-      <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 rounded-2xl p-5 sm:p-6">
-        <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <i className="ri-star-line text-yellow-500" />
-          Featured Resources
-        </h3>
-        <div className="flex gap-3 overflow-x-auto study-feature-tabs pb-1">
-          {featuredResources.map(res => (
-            <div key={res.id} className="min-w-[220px] sm:min-w-[260px] bg-white rounded-xl border border-gray-200 p-4 shrink-0 hover:shadow-md transition-shadow">
-              <div className="flex items-center gap-2 mb-2">
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${res.iconColor}`}>
-                  <i className={`${res.icon} text-lg`} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-900 truncate">{res.title}</p>
-                  <p className="text-xs text-gray-500">{res.subject}</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <StarRating rating={res.rating} />
-                <span className="text-xs text-gray-400">{res.downloads.toLocaleString()} downloads</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Semester Quick Access */}
-      <SemesterQuickAccess onSelect={setActiveSemester} allResources={allResources} />
-
-      {/* Category Tabs */}
-      <div className="overflow-x-auto study-feature-tabs">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 min-w-fit">
-          {resourceCategories.map(cat => (
+        {folderPath.map((folder, index) => (
+          <div key={folder.id} className="flex items-center gap-2">
+            <i className="ri-arrow-right-s-line text-gray-400" />
             <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-all ${
-                activeCategory === cat.id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
-              }`}
+              onClick={() => handleNavigateToFolder(index)}
+              className="text-gray-600 hover:text-indigo-600 transition-colors"
             >
-              <i className={cat.icon} />
-              {cat.label}
+              {folder.name}
             </button>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
 
-      {/* Search + Filters */}
+      {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -379,61 +811,222 @@ export default function ResourcesPage() {
             className="w-full h-10 pl-10 pr-4 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
           />
         </div>
-        <div className="flex gap-2 shrink-0">
-          <select
-            value={activeSemester}
-            onChange={e => setActiveSemester(e.target.value)}
-            className="h-10 px-3 rounded-lg border border-gray-200 text-sm bg-white focus:outline-none focus:border-indigo-500"
+        
+        <div className="flex gap-2">
+          <button
+            onClick={() => setFilterFavorites(!filterFavorites)}
+            className={`h-10 px-4 rounded-lg border text-sm font-medium transition-colors flex items-center gap-2 ${
+              filterFavorites ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+            }`}
           >
-            {semesters.map(s => <option key={s}>{s}</option>)}
-          </select>
-          <select
-            value={activeSubject}
-            onChange={e => setActiveSubject(e.target.value)}
-            className="h-10 px-3 rounded-lg border border-gray-200 text-sm bg-white focus:outline-none focus:border-indigo-500 hidden sm:block"
-          >
-            {subjects.map(s => <option key={s}>{s}</option>)}
-          </select>
-          <select
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value)}
-            className="h-10 px-3 rounded-lg border border-gray-200 text-sm bg-white focus:outline-none focus:border-indigo-500"
-          >
-            {sortOptions.map(s => <option key={s}>{s}</option>)}
-          </select>
+            <i className={filterFavorites ? 'ri-star-fill' : 'ri-star-line'} />
+            Favorites
+          </button>
+
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode(VIEW_MODES.GRID)}
+              className={`w-8 h-8 rounded flex items-center justify-center transition-colors ${
+                viewMode === VIEW_MODES.GRID ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
+              }`}
+            >
+              <i className="ri-grid-line" />
+            </button>
+            <button
+              onClick={() => setViewMode(VIEW_MODES.LIST)}
+              className={`w-8 h-8 rounded flex items-center justify-center transition-colors ${
+                viewMode === VIEW_MODES.LIST ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
+              }`}
+            >
+              <i className="ri-list-check" />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Results Count */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
-          Showing <span className="font-medium text-gray-900">{filteredResources.length}</span> resources
-        </p>
-      </div>
-
-      {/* Resources Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredResources.map(resource => (
-          <ResourceCard key={resource.id} resource={resource} onPreview={setPreviewResource} />
-        ))}
-      </div>
-
-      {filteredResources.length === 0 && (
-        <div className="text-center py-16">
-          <i className="ri-folder-open-line text-5xl text-gray-300" />
-          <p className="text-gray-500 mt-3 text-sm">No resources found matching your filters.</p>
+      {/* Tags Filter */}
+      {allTags.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-2">
+          <span className="text-xs text-gray-500 shrink-0">Tags:</span>
           <button
-            onClick={() => { setActiveCategory('all'); setActiveSemester('All'); setActiveSubject('All'); setSearch('') }}
-            className="mt-3 text-sm text-indigo-600 font-medium hover:text-indigo-700"
+            onClick={() => setSelectedTag(null)}
+            className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${
+              !selectedTag ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
           >
-            Clear all filters
+            All
           </button>
+          {allTags.map(tag => (
+            <button
+              key={tag}
+              onClick={() => setSelectedTag(tag)}
+              className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${
+                selectedTag === tag ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {tag}
+            </button>
+          ))}
         </div>
       )}
 
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+              <i className="ri-folder-line text-indigo-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Folders</p>
+              <p className="text-lg font-semibold text-gray-900">{folders.length}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+              <i className="ri-file-line text-blue-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Resources</p>
+              <p className="text-lg font-semibold text-gray-900">{resources.length}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-yellow-50 flex items-center justify-center">
+              <i className="ri-star-fill text-yellow-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Favorites</p>
+              <p className="text-lg font-semibold text-gray-900">{resources.filter(r => r.isFavorite).length}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
+              <i className="ri-price-tag-3-line text-green-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Tags</p>
+              <p className="text-lg font-semibold text-gray-900">{allTags.length}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      {folders.length === 0 && resources.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
+          <i className="ri-folder-open-line text-5xl text-gray-300" />
+          <p className="text-gray-500 mt-3 text-sm">
+            {search || filterFavorites || selectedTag ? 'No resources found matching your filters' : 'No resources yet'}
+          </p>
+          <button
+            onClick={handleCreateResource}
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
+          >
+            <i className="ri-add-line" />
+            Add Your First Resource
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* Folders */}
+          {folders.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <i className="ri-folder-line" />
+                Folders
+              </h3>
+              <div className={viewMode === VIEW_MODES.GRID ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4' : 'space-y-2'}>
+                {folders.map(folder => (
+                  <FolderCard
+                    key={folder._id}
+                    folder={folder}
+                    onOpen={handleOpenFolder}
+                    onEdit={handleEditFolder}
+                    onDelete={handleDeleteFolder}
+                    resourceCount={resources.filter(r => r.folderId === folder._id).length}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Resources */}
+          {resources.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <i className="ri-file-list-line" />
+                Resources ({resources.length})
+              </h3>
+              {viewMode === VIEW_MODES.GRID ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {resources.map(resource => (
+                    <ResourceGridCard
+                      key={resource._id}
+                      resource={resource}
+                      onEdit={handleEditResource}
+                      onDelete={handleDeleteResource}
+                      onToggleFavorite={handleToggleFavorite}
+                      onOpen={handleOpenResource}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {resources.map(resource => (
+                    <ResourceListItem
+                      key={resource._id}
+                      resource={resource}
+                      onEdit={handleEditResource}
+                      onDelete={handleDeleteResource}
+                      onToggleFavorite={handleToggleFavorite}
+                      onOpen={handleOpenResource}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
       {/* Modals */}
-      {showUpload && <UploadModal onClose={() => setShowUpload(false)} />}
-      {previewResource && <PreviewModal resource={previewResource} onClose={() => setPreviewResource(null)} />}
+      {showResourceModal && (
+        <ResourceModal
+          resource={editingResource}
+          folderId={currentFolderId}
+          onClose={() => {
+            setShowResourceModal(false)
+            setEditingResource(null)
+          }}
+          onSave={() => {
+            setShowResourceModal(false)
+            setEditingResource(null)
+            loadData()
+          }}
+        />
+      )}
+
+      {showFolderModal && (
+        <FolderModal
+          folder={editingFolder}
+          onClose={() => {
+            setShowFolderModal(false)
+            setEditingFolder(null)
+          }}
+          onSave={() => {
+            setShowFolderModal(false)
+            setEditingFolder(null)
+            loadData()
+          }}
+        />
+      )}
     </div>
   )
 }
