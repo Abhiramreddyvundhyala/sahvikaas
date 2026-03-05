@@ -42,6 +42,27 @@ function getRelativeLabel(dateStr) {
   return formatDateShort(dateStr)
 }
 
+const REMINDER_BEFORE_OPTIONS = ['No Reminder', '10 min before', '20 min before', '30 min before', '1 hour before', '2 hours before', '1 day before']
+
+function calculateReminderDateTime(date, time, reminderBefore) {
+  if (!reminderBefore || reminderBefore === 'No Reminder') return null
+  const dateTime = new Date(`${date}T${time || '00:00'}`)
+  const minutesBefore = { '10 min before': 10, '20 min before': 20, '30 min before': 30, '1 hour before': 60, '2 hours before': 120, '1 day before': 1440 }[reminderBefore]
+  if (!minutesBefore || isNaN(dateTime.getTime())) return null
+  dateTime.setMinutes(dateTime.getMinutes() - minutesBefore)
+  return {
+    date: `${dateTime.getFullYear()}-${String(dateTime.getMonth() + 1).padStart(2, '0')}-${String(dateTime.getDate()).padStart(2, '0')}`,
+    time: `${String(dateTime.getHours()).padStart(2, '0')}:${String(dateTime.getMinutes()).padStart(2, '0')}`
+  }
+}
+
+function parseDurationMinutes(dur) {
+  if (!dur) return 60
+  const hours = dur.match(/(\d+)\s*h/i)
+  const mins = dur.match(/(\d+)\s*m/i)
+  return (hours ? parseInt(hours[1]) * 60 : 0) + (mins ? parseInt(mins[1]) : 0) || 60
+}
+
 // ─── Countdown Hook ───
 function useCountdown(targetDateStr) {
   const [tl, setTl] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, expired: false })
@@ -69,6 +90,79 @@ function CountdownDisplay({ dateStr }) {
           <span className="text-[9px] text-gray-400 uppercase">{u.l}</span>
         </div>
       ))}
+    </div>
+  )
+}
+
+// ─── 12-hour time format helper ───
+function formatTime12(time24) {
+  if (!time24) return ''
+  const [h, m] = time24.split(':').map(Number)
+  if (isNaN(h) || isNaN(m)) return time24
+  const period = h >= 12 ? 'PM' : 'AM'
+  const h12 = h % 12 || 12
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`
+}
+
+// ─── AM/PM Time Picker Component ───
+function TimePickerInput({ value, onChange }) {
+  // Parse 24h value like "09:00" -> { hour: 9, minute: 0, period: 'AM' }
+  const parsed = (() => {
+    if (!value) return { hour: 12, minute: 0, period: 'AM' }
+    const [h, m] = value.split(':').map(Number)
+    return {
+      hour: h % 12 || 12,
+      minute: isNaN(m) ? 0 : m,
+      period: h >= 12 ? 'PM' : 'AM',
+    }
+  })()
+
+  const update = (h, m, p) => {
+    let h24 = h % 12
+    if (p === 'PM') h24 += 12
+    onChange(`${String(h24).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
+  }
+
+  const hours = Array.from({ length: 12 }, (_, i) => i + 1)
+  const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
+
+  return (
+    <div className="flex items-center gap-2">
+      <select
+        value={parsed.hour}
+        onChange={e => update(Number(e.target.value), parsed.minute, parsed.period)}
+        className="h-10 px-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white appearance-none text-center w-16"
+      >
+        {hours.map(h => (
+          <option key={h} value={h}>{String(h).padStart(2, '0')}</option>
+        ))}
+      </select>
+      <span className="text-gray-400 font-bold">:</span>
+      <select
+        value={parsed.minute}
+        onChange={e => update(parsed.hour, Number(e.target.value), parsed.period)}
+        className="h-10 px-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white appearance-none text-center w-16"
+      >
+        {minutes.map(m => (
+          <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+        ))}
+      </select>
+      <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => update(parsed.hour, parsed.minute, 'AM')}
+          className={`px-3 h-10 text-xs font-semibold transition-colors ${parsed.period === 'AM' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+        >
+          AM
+        </button>
+        <button
+          type="button"
+          onClick={() => update(parsed.hour, parsed.minute, 'PM')}
+          className={`px-3 h-10 text-xs font-semibold transition-colors ${parsed.period === 'PM' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+        >
+          PM
+        </button>
+      </div>
     </div>
   )
 }
@@ -105,6 +199,8 @@ function FormModal({ title, fields, onSubmit, onClose }) {
                   <input type="range" min="0" max="100" step="5" value={values[f.key]} onChange={e => updateField(f.key, e.target.value)} className="flex-1 accent-indigo-600" />
                   <span className="text-sm font-bold text-indigo-600 w-10 text-right">{values[f.key]}%</span>
                 </div>
+              ) : f.type === 'time' ? (
+                <TimePickerInput value={values[f.key]} onChange={val => updateField(f.key, val)} />
               ) : (
                 <input type={f.type || 'text'} value={values[f.key]} onChange={e => updateField(f.key, e.target.value)} placeholder={f.placeholder || ''} className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
               )}
@@ -146,7 +242,7 @@ function ConfirmModal({ message, onConfirm, onClose }) {
 // ═══════════════════════════════════════════
 const sessionTypes = ['Study', 'Lab', 'Group Study', 'Meeting', 'Workshop', 'Revision', 'Class', 'Other']
 
-function SessionsTab({ sessions, setSessions }) {
+function SessionsTab({ sessions, setSessions, setReminders }) {
   const [filter, setFilter] = useState('upcoming')
   const [showAdd, setShowAdd] = useState(false)
   const [deleteId, setDeleteId] = useState(null)
@@ -165,6 +261,32 @@ function SessionsTab({ sessions, setSessions }) {
   const nextSession = useMemo(() => {
     return sessions.filter(s => s.status === 'upcoming').sort((a, b) => new Date(a.date) - new Date(b.date))[0]
   }, [sessions])
+
+  // Auto-mark sessions as ended when their time + duration has passed
+  useEffect(() => {
+    const check = () => {
+      setSessions(prev => {
+        const now = new Date()
+        let changed = false
+        const next = prev.map(s => {
+          if (s.status !== 'upcoming') return s
+          const sessionStart = new Date(`${s.date}T${s.time || '00:00'}`)
+          const durationMins = parseDurationMinutes(s.duration)
+          const sessionEnd = new Date(sessionStart.getTime() + durationMins * 60000)
+          if (now >= sessionEnd) {
+            changed = true
+            updateSession(s.id, { status: 'completed' }).catch(() => {})
+            return { ...s, status: 'completed' }
+          }
+          return s
+        })
+        return changed ? next : prev
+      })
+    }
+    check()
+    const id = setInterval(check, 60000)
+    return () => clearInterval(id)
+  }, [])
 
   const toggleStatus = async (id) => {
     const session = sessions.find(s => s.id === id)
@@ -188,8 +310,6 @@ function SessionsTab({ sessions, setSessions }) {
       time: values.time,
       duration: values.duration,
       type: values.type,
-      location: values.location,
-      notes: values.notes,
       status: 'upcoming',
       colorIdx: Math.floor(Math.random() * COLORS.length),
     }
@@ -202,6 +322,16 @@ function SessionsTab({ sessions, setSessions }) {
       }
     } catch {
       setSessions(prev => [...prev, { ...newSession, id: Date.now() }])
+    }
+    // Create reminder if set
+    if (values.reminderBefore && values.reminderBefore !== 'No Reminder') {
+      const rt = calculateReminderDateTime(values.date, values.time, values.reminderBefore)
+      if (rt) {
+        const reminder = { title: `Session: ${values.title}`, date: rt.date, time: rt.time, type: 'study', priority: 'medium', done: false }
+        createReminder(reminder).then(res => {
+          if (res?.ok && res.reminder) setReminders(prev => [...prev, { ...res.reminder, id: res.reminder._id || res.reminder.id }])
+        }).catch(() => {})
+      }
     }
     setShowAdd(false)
   }
@@ -217,8 +347,7 @@ function SessionsTab({ sessions, setSessions }) {
           <h3 className="font-semibold text-lg">{nextSession.title}</h3>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-sm text-white/80">
             <span className="flex items-center gap-1"><i className="ri-calendar-line" />{getRelativeLabel(nextSession.date)}</span>
-            <span className="flex items-center gap-1"><i className="ri-time-line" />{nextSession.time}</span>
-            <span className="flex items-center gap-1"><i className="ri-map-pin-line" />{nextSession.location}</span>
+            <span className="flex items-center gap-1"><i className="ri-time-line" />{formatTime12(nextSession.time)}</span>
           </div>
         </div>
       )}
@@ -283,11 +412,9 @@ function SessionsTab({ sessions, setSessions }) {
                         <p className="text-xs text-gray-500 mt-0.5">{s.subject}</p>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-gray-500">
                           <span className="flex items-center gap-1"><i className="ri-calendar-line" />{formatDateShort(s.date)}</span>
-                          <span className="flex items-center gap-1"><i className="ri-time-line" />{s.time}</span>
+                          <span className="flex items-center gap-1"><i className="ri-time-line" />{formatTime12(s.time)}</span>
                           <span className="flex items-center gap-1"><i className="ri-hourglass-line" />{s.duration}</span>
-                          <span className="flex items-center gap-1"><i className="ri-map-pin-line" />{s.location}</span>
                         </div>
-                        {s.notes && <p className="text-xs text-gray-400 mt-1.5 italic">{s.notes}</p>}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <button onClick={() => toggleStatus(s.id)} className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isDone ? 'bg-green-50 hover:bg-green-100' : 'bg-gray-50 hover:bg-gray-100'}`} title={isDone ? 'Mark upcoming' : 'Mark done'}>
@@ -317,8 +444,7 @@ function SessionsTab({ sessions, setSessions }) {
             { key: 'time', label: 'Time', type: 'time', default: '09:00' },
             { key: 'duration', label: 'Duration', placeholder: 'e.g. 2h', default: '1h' },
             { key: 'type', label: 'Type', type: 'select', options: sessionTypes, default: 'Study' },
-            { key: 'location', label: 'Location', placeholder: 'e.g. Library, Lab 2, Online', default: '' },
-            { key: 'notes', label: 'Notes (optional)', type: 'textarea', placeholder: 'Add any notes...', default: '' },
+            { key: 'reminderBefore', label: 'Remind Before', type: 'select', options: REMINDER_BEFORE_OPTIONS, default: 'No Reminder' },
           ]}
           onSubmit={addSession}
           onClose={() => setShowAdd(false)}
@@ -333,7 +459,7 @@ function SessionsTab({ sessions, setSessions }) {
 // ═══════════════════════════════════════════
 // TAB 2: EXAMS
 // ═══════════════════════════════════════════
-function ExamsTab({ exams, setExams }) {
+function ExamsTab({ exams, setExams, setReminders }) {
   const [examFilter, setExamFilter] = useState('all')
   const [showAdd, setShowAdd] = useState(false)
   const [deleteId, setDeleteId] = useState(null)
@@ -352,8 +478,7 @@ function ExamsTab({ exams, setExams }) {
       venue: values.venue,
       type: values.type,
       units: values.units,
-      syllabusProgress: parseInt(values.syllabusProgress) || 0,
-      notes: values.notes,
+      syllabusProgress: 0,
       colorIdx: Math.floor(Math.random() * COLORS.length),
     }
     try {
@@ -365,6 +490,16 @@ function ExamsTab({ exams, setExams }) {
       }
     } catch {
       setExams(prev => [...prev, { ...newExam, id: Date.now() }])
+    }
+    // Create reminder if set
+    if (values.reminderBefore && values.reminderBefore !== 'No Reminder') {
+      const rt = calculateReminderDateTime(values.date, values.time, values.reminderBefore)
+      if (rt) {
+        const reminder = { title: `Exam: ${values.subject}`, date: rt.date, time: rt.time, type: 'exam', priority: 'high', done: false }
+        createReminder(reminder).then(res => {
+          if (res?.ok && res.reminder) setReminders(prev => [...prev, { ...res.reminder, id: res.reminder._id || res.reminder.id }])
+        }).catch(() => {})
+      }
     }
     setShowAdd(false)
   }
@@ -422,7 +557,7 @@ function ExamsTab({ exams, setExams }) {
                       <h4 className="font-semibold text-gray-900">{exam.subject}</h4>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-gray-500">
                         <span className="flex items-center gap-1"><i className="ri-calendar-line" />{formatDateShort(exam.date)}</span>
-                        <span className="flex items-center gap-1"><i className="ri-time-line" />{exam.time}</span>
+                        <span className="flex items-center gap-1"><i className="ri-time-line" />{formatTime12(exam.time)}</span>
                         <span className="flex items-center gap-1"><i className="ri-map-pin-line" />{exam.venue}</span>
                         <span className="flex items-center gap-1"><i className="ri-book-open-line" />{exam.units}</span>
                       </div>
@@ -436,20 +571,7 @@ function ExamsTab({ exams, setExams }) {
                     </div>
                   </div>
 
-                  {/* Syllabus Progress (editable) */}
-                  <div className="mt-4 pt-3 border-t border-gray-100">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs text-gray-500">Syllabus Coverage</span>
-                      <span className={`text-xs font-bold ${exam.syllabusProgress >= 75 ? 'text-green-600' : exam.syllabusProgress >= 50 ? 'text-amber-600' : 'text-red-600'}`}>{exam.syllabusProgress}%</span>
-                    </div>
-                    <input
-                      type="range" min="0" max="100" step="5"
-                      value={exam.syllabusProgress}
-                      onChange={e => updateProgress(exam.id, e.target.value)}
-                      className="w-full h-2 rounded-full appearance-none cursor-pointer accent-indigo-600 bg-gray-100"
-                    />
-                    {!isPast && <p className="text-[10px] text-gray-400 mt-1">Drag to update progress</p>}
-                  </div>
+
                 </div>
               </div>
             </div>
@@ -474,7 +596,7 @@ function ExamsTab({ exams, setExams }) {
                     </div>
                     <div className="flex-1 pb-2">
                       <p className="text-sm font-semibold text-gray-900">{exam.subject}</p>
-                      <p className="text-xs text-gray-500">{formatDateShort(exam.date)} \u2022 {exam.time} \u2022 {exam.type}</p>
+                      <p className="text-xs text-gray-500">{formatDateShort(exam.date)} \u2022 {formatTime12(exam.time)} \u2022 {exam.type}</p>
                       {!isPast && <p className="text-xs text-indigo-600 font-medium mt-0.5">{daysLeft === 0 ? 'Today!' : `${daysLeft} days to go`}</p>}
                     </div>
                   </div>
@@ -496,8 +618,7 @@ function ExamsTab({ exams, setExams }) {
             { key: 'venue', label: 'Venue', placeholder: 'e.g. Hall A', default: '' },
             { key: 'type', label: 'Type', type: 'select', options: ['Internal', 'External', 'Quiz', 'Viva'], default: 'Internal' },
             { key: 'units', label: 'Syllabus', placeholder: 'e.g. Units 1-3', default: '' },
-            { key: 'syllabusProgress', label: 'Current Preparation (%)', type: 'range', default: '0' },
-            { key: 'notes', label: 'Notes (optional)', type: 'textarea', placeholder: 'Important topics...', default: '' },
+            { key: 'reminderBefore', label: 'Remind Before', type: 'select', options: REMINDER_BEFORE_OPTIONS, default: 'No Reminder' },
           ]}
           onSubmit={addExam}
           onClose={() => setShowAdd(false)}
@@ -512,7 +633,7 @@ function ExamsTab({ exams, setExams }) {
 // ═══════════════════════════════════════════
 // TAB 3: EVENTS
 // ═══════════════════════════════════════════
-function EventsTab({ events, setEvents }) {
+function EventsTab({ events, setEvents, setReminders }) {
   const [catFilter, setCatFilter] = useState('all')
   const [showAdd, setShowAdd] = useState(false)
   const [deleteId, setDeleteId] = useState(null)
@@ -552,6 +673,16 @@ function EventsTab({ events, setEvents }) {
       }
     } catch {
       setEvents(prev => [...prev, { ...newEvent, id: Date.now() }])
+    }
+    // Create reminder if set
+    if (values.reminderBefore && values.reminderBefore !== 'No Reminder') {
+      const rt = calculateReminderDateTime(values.date, values.time, values.reminderBefore)
+      if (rt) {
+        const reminder = { title: `Event: ${values.title}`, date: rt.date, time: rt.time, type: 'other', priority: 'medium', done: false }
+        createReminder(reminder).then(res => {
+          if (res?.ok && res.reminder) setReminders(prev => [...prev, { ...res.reminder, id: res.reminder._id || res.reminder.id }])
+        }).catch(() => {})
+      }
     }
     setShowAdd(false)
   }
@@ -604,7 +735,7 @@ function EventsTab({ events, setEvents }) {
                   <p className="text-xs text-gray-500 mb-3 line-clamp-2">{event.desc}</p>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mb-3">
                     <span className="flex items-center gap-1"><i className="ri-calendar-line" />{formatDateShort(event.date)}</span>
-                    <span className="flex items-center gap-1"><i className="ri-time-line" />{event.time}</span>
+                    <span className="flex items-center gap-1"><i className="ri-time-line" />{formatTime12(event.time)}</span>
                     <span className="flex items-center gap-1"><i className="ri-map-pin-line" />{event.venue}</span>
                   </div>
                   <button
@@ -635,6 +766,7 @@ function EventsTab({ events, setEvents }) {
             { key: 'venue', label: 'Venue', placeholder: 'e.g. Main Auditorium', default: '' },
             { key: 'category', label: 'Category', type: 'select', options: ['Technical', 'Cultural', 'Sports', 'Workshop', 'Seminar'], default: 'Technical' },
             { key: 'desc', label: 'Description', type: 'textarea', placeholder: 'Event details...', default: '' },
+            { key: 'reminderBefore', label: 'Remind Before', type: 'select', options: REMINDER_BEFORE_OPTIONS, default: 'No Reminder' },
           ]}
           onSubmit={addEvent}
           onClose={() => setShowAdd(false)}
@@ -651,14 +783,14 @@ function EventsTab({ events, setEvents }) {
 // ═══════════════════════════════════════════
 function CalendarTab({ sessions, exams, events, reminders }) {
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [selectedDate, setSelectedDate] = useState(null)
+  const today = new Date()
+  const [selectedDate, setSelectedDate] = useState(today.getDate())
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
   const monthName = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })
   const firstDay = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const today = new Date()
 
   const calendarDays = useMemo(() => {
     const days = []
@@ -683,10 +815,26 @@ function CalendarTab({ sessions, exams, events, reminders }) {
     if (!day) return []
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     const items = []
-    sessions.filter(s => s.date === dateStr).forEach(s => items.push({ type: 'session', title: s.title, time: s.time, detail: `${s.subject} \u2022 ${s.location}` }))
-    exams.filter(e => e.date === dateStr).forEach(e => items.push({ type: 'exam', title: `${e.type}: ${e.subject}`, time: e.time, detail: e.venue }))
-    events.filter(e => e.date === dateStr).forEach(e => items.push({ type: 'event', title: e.title, time: e.time, detail: e.venue }))
-    reminders.filter(r => r.date === dateStr).forEach(r => items.push({ type: 'reminder', title: r.title, time: r.time, detail: r.type }))
+    // Collect reminders for this date to attach to their parent items
+    const dateReminders = reminders.filter(r => r.date === dateStr)
+    const usedReminderIds = new Set()
+    sessions.filter(s => s.date === dateStr).forEach(s => {
+      const matchedReminder = dateReminders.find(r => r.title === `Session: ${s.title}` && !usedReminderIds.has(r.id))
+      if (matchedReminder) usedReminderIds.add(matchedReminder.id)
+      items.push({ type: 'session', title: s.title, time: s.time, detail: s.subject, reminder: matchedReminder ? matchedReminder.time : null })
+    })
+    exams.filter(e => e.date === dateStr).forEach(e => {
+      const matchedReminder = dateReminders.find(r => r.title === `Exam: ${e.subject}` && !usedReminderIds.has(r.id))
+      if (matchedReminder) usedReminderIds.add(matchedReminder.id)
+      items.push({ type: 'exam', title: `${e.type}: ${e.subject}`, time: e.time, detail: e.venue, reminder: matchedReminder ? matchedReminder.time : null })
+    })
+    events.filter(e => e.date === dateStr).forEach(e => {
+      const matchedReminder = dateReminders.find(r => r.title === `Event: ${e.title}` && !usedReminderIds.has(r.id))
+      if (matchedReminder) usedReminderIds.add(matchedReminder.id)
+      items.push({ type: 'event', title: e.title, time: e.time, detail: e.venue, reminder: matchedReminder ? matchedReminder.time : null })
+    })
+    // Only show reminders that aren't attached to a session/exam/event
+    dateReminders.filter(r => !usedReminderIds.has(r.id)).forEach(r => items.push({ type: 'reminder', title: r.title, time: r.time, detail: r.type, reminder: null }))
     return items
   }, [year, month, sessions, exams, events, reminders])
 
@@ -770,7 +918,8 @@ function CalendarTab({ sessions, exams, events, reminders }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{item.title}</p>
-                      <p className="text-xs text-gray-500">{item.time} \u2022 {item.detail}</p>
+                      <p className="text-xs text-gray-500">{formatTime12(item.time)}{item.detail ? ` \u2022 ${item.detail}` : ''}</p>
+                      {item.reminder && <p className="text-[10px] text-amber-600 flex items-center gap-1 mt-0.5"><i className="ri-alarm-line" />Reminder at {formatTime12(item.reminder)}</p>}
                     </div>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium capitalize ${style.bg} ${style.text}`}>{item.type}</span>
                   </div>
@@ -788,7 +937,6 @@ function CalendarTab({ sessions, exams, events, reminders }) {
 // TAB 5: REMINDERS
 // ═══════════════════════════════════════════
 function RemindersTab({ reminders, setReminders }) {
-  const [priorityFilter, setPriorityFilter] = useState('all')
   const [showAdd, setShowAdd] = useState(false)
   const [deleteId, setDeleteId] = useState(null)
 
@@ -800,10 +948,8 @@ function RemindersTab({ reminders, setReminders }) {
   }
 
   const filtered = useMemo(() => {
-    let result = reminders
-    if (priorityFilter !== 'all') result = result.filter(r => r.priority === priorityFilter)
-    return result.sort((a, b) => { if (a.done !== b.done) return a.done ? 1 : -1; return new Date(a.date) - new Date(b.date) })
-  }, [reminders, priorityFilter])
+    return [...reminders].sort((a, b) => { if (a.done !== b.done) return a.done ? 1 : -1; return new Date(a.date) - new Date(b.date) })
+  }, [reminders])
 
   const overdue = filtered.filter(r => !r.done && getDaysUntil(r.date) < 0)
   const upcoming = filtered.filter(r => !r.done && getDaysUntil(r.date) >= 0)
@@ -813,7 +959,7 @@ function RemindersTab({ reminders, setReminders }) {
   const typeIcons = { assignment: 'ri-file-edit-line', submission: 'ri-upload-2-line', meeting: 'ri-team-line', study: 'ri-book-read-line', exam: 'ri-file-list-line', other: 'ri-alarm-line' }
 
   const addReminder = async (values) => {
-    const newReminder = { title: values.title, date: values.date, time: values.time, type: values.type, priority: values.priority, done: false }
+    const newReminder = { title: values.title, date: values.date, time: values.time, type: values.type, priority: 'medium', done: false }
     try {
       const res = await createReminder(newReminder)
       if (res?.ok && res.reminder) {
@@ -844,7 +990,7 @@ function RemindersTab({ reminders, setReminders }) {
         <div className="flex-1 min-w-0">
           <p className={`text-sm font-medium truncate ${r.done ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{r.title}</p>
           <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-xs text-gray-500">{formatDateShort(r.date)} \u2022 {r.time}</span>
+            <span className="text-xs text-gray-500">{formatDateShort(r.date)} \u2022 {formatTime12(r.time)}</span>
             {!r.done && <span className={`text-xs font-medium ${isOverdueItem ? 'text-red-600' : daysLeft <= 3 ? 'text-amber-600' : 'text-gray-500'}`}>{isOverdueItem ? `${Math.abs(daysLeft)}d overdue` : daysLeft === 0 ? 'Due today' : `${daysLeft}d left`}</span>}
           </div>
         </div>
@@ -858,12 +1004,7 @@ function RemindersTab({ reminders, setReminders }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-          {['all', 'high', 'medium', 'low'].map(f => (
-            <button key={f} onClick={() => setPriorityFilter(f)} className={`px-3 py-1.5 text-xs font-medium rounded-md capitalize transition-all ${priorityFilter === f ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>{f}</button>
-          ))}
-        </div>
+      <div className="flex justify-end">
         <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition-colors w-fit">
           <i className="ri-add-line" /> Add Reminder
         </button>
@@ -903,7 +1044,6 @@ function RemindersTab({ reminders, setReminders }) {
             { key: 'date', label: 'Date', type: 'date', default: new Date().toISOString().split('T')[0] },
             { key: 'time', label: 'Time', type: 'time', default: '23:59' },
             { key: 'type', label: 'Type', type: 'select', options: ['assignment', 'submission', 'meeting', 'study', 'exam', 'other'], default: 'assignment' },
-            { key: 'priority', label: 'Priority', type: 'select', options: ['high', 'medium', 'low'], default: 'medium' },
           ]}
           onSubmit={addReminder}
           onClose={() => setShowAdd(false)}
@@ -964,7 +1104,6 @@ export default function SchedulePage() {
   const upcomingSessions = sessions.filter(s => s.status === 'upcoming').length
   const upcomingExams = exams.filter(e => getDaysUntil(e.date) > 0).length
   const activeReminders = reminders.filter(r => !r.done).length
-  const completedSessions = sessions.filter(s => s.status === 'completed').length
 
   if (loading) {
     return (
@@ -986,10 +1125,9 @@ export default function SchedulePage() {
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {[
           { label: 'Upcoming Sessions', value: upcomingSessions, icon: 'ri-book-read-fill', color: 'text-indigo-500', bg: 'bg-indigo-50' },
-          { label: 'Completed', value: completedSessions, icon: 'ri-check-double-fill', color: 'text-green-500', bg: 'bg-green-50' },
           { label: 'Upcoming Exams', value: upcomingExams, icon: 'ri-alarm-warning-fill', color: 'text-amber-500', bg: 'bg-amber-50' },
           { label: 'Active Reminders', value: activeReminders, icon: 'ri-notification-fill', color: 'text-red-500', bg: 'bg-red-50' },
         ].map(stat => (
@@ -1020,9 +1158,9 @@ export default function SchedulePage() {
 
       {/* Tab Content */}
       <div>
-        {activeTab === 'sessions' && <SessionsTab sessions={sessions} setSessions={setSessions} />}
-        {activeTab === 'exams' && <ExamsTab exams={exams} setExams={setExams} />}
-        {activeTab === 'events' && <EventsTab events={events} setEvents={setEvents} />}
+        {activeTab === 'sessions' && <SessionsTab sessions={sessions} setSessions={setSessions} setReminders={setReminders} />}
+        {activeTab === 'exams' && <ExamsTab exams={exams} setExams={setExams} setReminders={setReminders} />}
+        {activeTab === 'events' && <EventsTab events={events} setEvents={setEvents} setReminders={setReminders} />}
         {activeTab === 'calendar' && <CalendarTab sessions={sessions} exams={exams} events={events} reminders={reminders} />}
         {activeTab === 'reminders' && <RemindersTab reminders={reminders} setReminders={setReminders} />}
       </div>

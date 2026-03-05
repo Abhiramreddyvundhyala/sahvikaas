@@ -267,8 +267,8 @@ export async function getBadges() {
   return apiRequest('/api/achievements/badges')
 }
 
-export async function getLeaderboard() {
-  return apiRequest('/api/achievements/leaderboard')
+export async function getLeaderboard(period = 'all-time') {
+  return apiRequest(`/api/achievements/leaderboard?period=${period}`)
 }
 
 export async function getStudyActivity() {
@@ -284,5 +284,12 @@ export async function logStudyActivity(date, hours) {
 
 export async function getAchievementStats() {
   return apiRequest('/api/achievements/stats')
+}
+
+export async function submitQuizResult(score, total) {
+  return apiRequest('/api/achievements/quiz-result', {
+    method: 'POST',
+    body: { score, total },
+  })
 }
 

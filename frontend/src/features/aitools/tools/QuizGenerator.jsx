@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { apiRequest } from '../../../lib/api'
+import { apiRequest, submitQuizResult } from '../../../lib/api'
 
 export default function QuizGenerator() {
   const navigate = useNavigate()
@@ -42,8 +42,15 @@ export default function QuizGenerator() {
     setAnswers({ ...answers, [qIndex]: optionIndex })
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setShowResults(true)
+    // Submit quiz result to track badge progress
+    const correct = Object.entries(answers).filter(([qIdx, ans]) =>
+      questions[qIdx]?.correct === ans
+    ).length
+    try {
+      await submitQuizResult(correct, questions.length)
+    } catch { /* ignore */ }
   }
 
   const score = Object.entries(answers).filter(([qIdx, ans]) => 

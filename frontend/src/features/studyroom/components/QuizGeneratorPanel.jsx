@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { generateQuiz } from '../../../lib/api'
+import { generateQuiz, submitQuizResult } from '../../../lib/api'
 
 export default function QuizGeneratorPanel() {
   const [file, setFile] = useState(null)
@@ -63,7 +63,7 @@ export default function QuizGeneratorPanel() {
     }
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (timerRef.current) clearInterval(timerRef.current)
     let correct = 0
     questions.forEach((q, i) => {
@@ -71,6 +71,10 @@ export default function QuizGeneratorPanel() {
     })
     setScore({ correct, total: questions.length })
     setStage('results')
+    // Submit quiz result for badge tracking
+    try {
+      await submitQuizResult(correct, questions.length)
+    } catch { /* ignore */ }
   }
 
   const resetQuiz = () => {

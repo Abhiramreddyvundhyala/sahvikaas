@@ -4,6 +4,8 @@ import StudySession from '../models/StudySession.js'
 import Exam from '../models/Exam.js'
 import Event from '../models/Event.js'
 import Reminder from '../models/Reminder.js'
+import User from '../models/User.js'
+import StudyActivity from '../models/StudyActivity.js'
 
 const router = express.Router()
 
@@ -39,12 +41,35 @@ router.post('/sessions', authMiddleware, async (req, res) => {
 
 router.put('/sessions/:id', authMiddleware, async (req, res) => {
   try {
+    const oldSession = await StudySession.findOne({ _id: req.params.id, userId: req.user._id })
+    if (!oldSession) return res.status(404).json({ error: 'Session not found.' })
+
+    const wasCompleted = oldSession.status === 'completed'
     const session = await StudySession.findOneAndUpdate(
       { _id: req.params.id, userId: req.user._id },
       { $set: req.body },
       { new: true }
     )
-    if (!session) return res.status(404).json({ error: 'Session not found.' })
+
+    // If session just got marked as completed, award XP and log activity
+    if (!wasCompleted && session.status === 'completed') {
+      const hours = parseFloat(session.duration) || 1
+      const today = new Date().toISOString().split('T')[0]
+
+      // Log study activity for the session date
+      await StudyActivity.findOneAndUpdate(
+        { userId: req.user._id, date: session.date || today },
+        { $inc: { hours } },
+        { upsert: true, new: true }
+      )
+
+      // Award XP (15 XP per completed session)
+      await User.findByIdAndUpdate(req.user._id, {
+        $inc: { totalXP: 15, totalStudyHours: hours },
+        lastStudyDate: new Date(),
+      })
+    }
+
     res.json({ ok: true, session })
   } catch (err) {
     res.status(500).json({ error: 'Failed to update session.' })

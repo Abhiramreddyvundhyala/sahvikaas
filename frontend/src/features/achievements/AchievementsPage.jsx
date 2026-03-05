@@ -81,13 +81,53 @@ function BadgeCard({ badge }) {
 }
 
 // ─── Leaderboard Tab ───
-function LeaderboardTab({ leaderboardData }) {
+function LeaderboardTab({ leaderboardData: initialData, currentUserRank: initialUserRank }) {
   const [filter, setFilter] = useState('all-time')
+  const [leaderboardData, setLeaderboardData] = useState(initialData || [])
+  const [currentUserRank, setCurrentUserRank] = useState(initialUserRank || null)
+  const [loadingFilter, setLoadingFilter] = useState(false)
   const rankColors = ['bg-yellow-400', 'bg-gray-300', 'bg-amber-600']
 
-  if (!leaderboardData || leaderboardData.length === 0) {
-    return <p className="text-sm text-gray-400 text-center py-8">No leaderboard data yet. Start studying to appear here!</p>
+  useEffect(() => {
+    setLeaderboardData(initialData || [])
+    setCurrentUserRank(initialUserRank || null)
+  }, [initialData, initialUserRank])
+
+  const handleFilterChange = async (f) => {
+    setFilter(f)
+    setLoadingFilter(true)
+    try {
+      const res = await getLeaderboard(f)
+      if (res?.ok) {
+        setLeaderboardData(res.leaderboard || [])
+        setCurrentUserRank(res.currentUserRank || null)
+      }
+    } catch { /* ignore */ }
+    setLoadingFilter(false)
   }
+
+  if (!leaderboardData || leaderboardData.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+          {['weekly', 'monthly', 'all-time'].map(f => (
+            <button
+              key={f}
+              onClick={() => handleFilterChange(f)}
+              className={`px-4 py-1.5 text-xs font-medium rounded-md capitalize transition-all ${filter === f ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              {f.replace('-', ' ')}
+            </button>
+          ))}
+        </div>
+        <p className="text-sm text-gray-400 text-center py-8">No leaderboard data yet. Start studying to appear here!</p>
+      </div>
+    )
+  }
+
+  // Get top 3 (or fewer)
+  const top3 = leaderboardData.slice(0, Math.min(3, leaderboardData.length))
+  const rest = leaderboardData.slice(3)
 
   return (
     <div className="space-y-4">
@@ -96,7 +136,7 @@ function LeaderboardTab({ leaderboardData }) {
         {['weekly', 'monthly', 'all-time'].map(f => (
           <button
             key={f}
-            onClick={() => setFilter(f)}
+            onClick={() => handleFilterChange(f)}
             className={`px-4 py-1.5 text-xs font-medium rounded-md capitalize transition-all ${filter === f ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
           >
             {f.replace('-', ' ')}
@@ -104,55 +144,97 @@ function LeaderboardTab({ leaderboardData }) {
         ))}
       </div>
 
-      {/* Top 3 Podium */}
-      <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
-        {[1, 0, 2].map(idx => {
-          const user = leaderboardData[idx]
-          const isFirst = idx === 0
-          return (
-            <div key={user.rank} className={`flex flex-col items-center ${isFirst ? 'order-2 sm:-mt-4' : idx === 1 ? 'order-1' : 'order-3'}`}>
-              <div className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br ${isFirst ? 'from-yellow-400 to-amber-500' : idx === 1 ? 'from-gray-300 to-gray-400' : 'from-amber-600 to-amber-700'} flex items-center justify-center text-white font-bold text-lg sm:text-xl shadow-lg`}>
-                {user.avatar}
-                <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full ${rankColors[idx]} flex items-center justify-center text-xs font-bold text-white shadow border-2 border-white`}>
-                  {user.rank}
-                </div>
-              </div>
-              <p className="text-xs sm:text-sm font-semibold text-gray-900 mt-2 text-center truncate max-w-full">{user.name}</p>
-              <p className="text-xs text-indigo-600 font-bold">{user.xp.toLocaleString()} XP</p>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Rest of leaderboard */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase">
-          <div className="col-span-1">#</div>
-          <div className="col-span-5">Student</div>
-          <div className="col-span-2 text-center">Dept</div>
-          <div className="col-span-2 text-center">Streak</div>
-          <div className="col-span-2 text-right">XP</div>
+      {loadingFilter ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
         </div>
-        {leaderboardData.slice(3).map(user => (
-          <div key={user.rank} className="grid grid-cols-12 gap-2 px-4 py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors items-center">
-            <div className="col-span-1 text-sm font-semibold text-gray-400">{user.rank}</div>
-            <div className="col-span-5 flex items-center gap-2 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-600 shrink-0">
-                {user.avatar}
+      ) : (
+        <>
+          {/* Top 3 Podium */}
+          {top3.length >= 3 ? (
+            <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+              {[1, 0, 2].map(idx => {
+                const user = top3[idx]
+                if (!user) return <div key={idx} />
+                const isFirst = idx === 0
+                return (
+                  <div key={user.rank} className={`flex flex-col items-center ${isFirst ? 'order-2 sm:-mt-4' : idx === 1 ? 'order-1' : 'order-3'}`}>
+                    <div className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br ${isFirst ? 'from-yellow-400 to-amber-500' : idx === 1 ? 'from-gray-300 to-gray-400' : 'from-amber-600 to-amber-700'} flex items-center justify-center text-white font-bold text-lg sm:text-xl shadow-lg ${user.isCurrentUser ? 'ring-3 ring-indigo-400' : ''}`}>
+                      {user.avatar}
+                      <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full ${rankColors[idx]} flex items-center justify-center text-xs font-bold text-white shadow border-2 border-white`}>
+                        {user.rank}
+                      </div>
+                    </div>
+                    <p className={`text-xs sm:text-sm font-semibold mt-2 text-center truncate max-w-full ${user.isCurrentUser ? 'text-indigo-600' : 'text-gray-900'}`}>{user.name}{user.isCurrentUser ? ' (You)' : ''}</p>
+                    <p className="text-xs text-indigo-600 font-bold">{user.xp.toLocaleString()} XP</p>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="space-y-2 mb-4">
+              {top3.map(user => (
+                <div key={user.rank} className={`flex items-center gap-3 bg-white rounded-xl border p-4 ${user.isCurrentUser ? 'border-indigo-300 bg-indigo-50/50' : 'border-gray-200'}`}>
+                  <div className={`w-10 h-10 rounded-full ${rankColors[user.rank - 1] || 'bg-gray-200'} flex items-center justify-center text-white font-bold text-sm`}>
+                    {user.avatar}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-semibold ${user.isCurrentUser ? 'text-indigo-600' : 'text-gray-900'}`}>#{user.rank} {user.name}{user.isCurrentUser ? ' (You)' : ''}</p>
+                    <p className="text-xs text-gray-500">{user.dept}</p>
+                  </div>
+                  <p className="text-sm font-bold text-indigo-600">{user.xp.toLocaleString()} XP</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Rest of leaderboard */}
+          {rest.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase">
+                <div className="col-span-1">#</div>
+                <div className="col-span-5">Student</div>
+                <div className="col-span-2 text-center">Dept</div>
+                <div className="col-span-2 text-center">Streak</div>
+                <div className="col-span-2 text-right">XP</div>
               </div>
-              <span className="text-sm font-medium text-gray-900 truncate">{user.name}</span>
+              {rest.map(user => (
+                <div key={user.rank} className={`grid grid-cols-12 gap-2 px-4 py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors items-center ${user.isCurrentUser ? 'bg-indigo-50/50' : ''}`}>
+                  <div className="col-span-1 text-sm font-semibold text-gray-400">{user.rank}</div>
+                  <div className="col-span-5 flex items-center gap-2 min-w-0">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${user.isCurrentUser ? 'bg-indigo-200 text-indigo-700' : 'bg-indigo-100 text-indigo-600'}`}>
+                      {user.avatar}
+                    </div>
+                    <span className={`text-sm font-medium truncate ${user.isCurrentUser ? 'text-indigo-600' : 'text-gray-900'}`}>{user.name}{user.isCurrentUser ? ' (You)' : ''}</span>
+                  </div>
+                  <div className="col-span-2 text-center">
+                    <span className="text-xs px-2 py-0.5 bg-gray-100 rounded-full text-gray-600">{user.dept}</span>
+                  </div>
+                  <div className="col-span-2 text-center flex items-center justify-center gap-1">
+                    <i className="ri-fire-fill text-orange-500 text-xs" />
+                    <span className="text-xs font-medium text-gray-700">{user.streak}d</span>
+                  </div>
+                  <div className="col-span-2 text-right text-sm font-bold text-indigo-600">{user.xp.toLocaleString()}</div>
+                </div>
+              ))}
             </div>
-            <div className="col-span-2 text-center">
-              <span className="text-xs px-2 py-0.5 bg-gray-100 rounded-full text-gray-600">{user.dept}</span>
+          )}
+
+          {/* Show current user's rank if not in top 20 */}
+          {currentUserRank && (
+            <div className="bg-indigo-50 rounded-xl border border-indigo-200 p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-indigo-200 flex items-center justify-center text-xs font-bold text-indigo-700 shrink-0">
+                {currentUserRank.avatar}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-indigo-600">Your Rank: #{currentUserRank.rank}</p>
+                <p className="text-xs text-gray-500">{currentUserRank.dept} • {currentUserRank.streak}d streak</p>
+              </div>
+              <p className="text-sm font-bold text-indigo-600">{currentUserRank.xp.toLocaleString()} XP</p>
             </div>
-            <div className="col-span-2 text-center flex items-center justify-center gap-1">
-              <i className="ri-fire-fill text-orange-500 text-xs" />
-              <span className="text-xs font-medium text-gray-700">{user.streak}d</span>
-            </div>
-            <div className="col-span-2 text-right text-sm font-bold text-indigo-600">{user.xp.toLocaleString()}</div>
-          </div>
-        ))}
-      </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -281,30 +363,44 @@ export default function AchievementsPage() {
   const [loading, setLoading] = useState(true)
   const [badges, setBadges] = useState([])
   const [leaderboardData, setLeaderboardData] = useState([])
+  const [currentUserRank, setCurrentUserRank] = useState(null)
   const [streakData, setStreakData] = useState([])
   const [stats, setStats] = useState({ totalXP: 0, currentStreak: 0, longestStreak: 0, rank: '—' })
 
+  const loadData = async (showLoader = true) => {
+    if (showLoader) setLoading(true)
+    try {
+      const [badgeRes, lbRes, actRes, statRes] = await Promise.all([
+        getBadges().catch(() => null),
+        getLeaderboard().catch(() => null),
+        getStudyActivity().catch(() => null),
+        getAchievementStats().catch(() => null),
+      ])
+      if (badgeRes?.ok) setBadges(badgeRes.badges || [])
+      if (lbRes?.ok) {
+        setLeaderboardData(lbRes.leaderboard || [])
+        setCurrentUserRank(lbRes.currentUserRank || null)
+      }
+      if (actRes?.ok) setStreakData(actRes.activity || [])
+      if (statRes?.ok) setStats(statRes.stats || stats)
+    } catch { /* ignore */ }
+    if (showLoader) setLoading(false)
+  }
+
   useEffect(() => {
     let mounted = true
-    const load = async () => {
-      setLoading(true)
-      try {
-        const [badgeRes, lbRes, actRes, statRes] = await Promise.all([
-          getBadges().catch(() => null),
-          getLeaderboard().catch(() => null),
-          getStudyActivity().catch(() => null),
-          getAchievementStats().catch(() => null),
-        ])
-        if (!mounted) return
-        if (badgeRes?.ok) setBadges(badgeRes.badges || [])
-        if (lbRes?.ok) setLeaderboardData(lbRes.leaderboard || [])
-        if (actRes?.ok) setStreakData(actRes.activity || [])
-        if (statRes?.ok) setStats(statRes.stats || stats)
-      } catch { /* ignore */ }
-      if (mounted) setLoading(false)
+    const init = async () => {
+      await loadData(true)
+      if (!mounted) return
     }
-    load()
-    return () => { mounted = false }
+    init()
+
+    // Auto-refresh every 30 seconds to pick up realtime changes
+    const interval = setInterval(() => {
+      if (mounted) loadData(false)
+    }, 30000)
+
+    return () => { mounted = false; clearInterval(interval) }
   }, [])
 
   const totalBadges = badges.length
@@ -380,7 +476,7 @@ export default function AchievementsPage() {
             </div>
           )
         )}
-        {activeTab === 'leaderboard' && <LeaderboardTab leaderboardData={leaderboardData} />}
+        {activeTab === 'leaderboard' && <LeaderboardTab leaderboardData={leaderboardData} currentUserRank={currentUserRank} />}
         {activeTab === 'streaks' && <StreaksTab streakData={streakData} />}
         {activeTab === 'milestones' && <MilestonesTab />}
       </div>

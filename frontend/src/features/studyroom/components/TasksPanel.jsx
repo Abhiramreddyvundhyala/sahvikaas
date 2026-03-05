@@ -5,7 +5,7 @@ import { getSocket } from '../../../lib/socket'
 export default function TasksPanel({ roomId }) {
   const [tasks, setTasks] = useState([])
   const [showAddModal, setShowAddModal] = useState(false)
-  const [newTask, setNewTask] = useState({ text: '', dueDate: '' })
+  const [newTask, setNewTask] = useState({ text: '', dueDate: '', dueTime: '09:00' })
 
   // Subscribe to real-time task events
   useEffect(() => {
@@ -35,10 +35,10 @@ export default function TasksPanel({ roomId }) {
     if (socket?.connected && roomId) {
       socket.emit('task-add', {
         meetingId: roomId,
-        task: { text: newTask.text.trim(), dueDate: newTask.dueDate },
+        task: { text: newTask.text.trim(), dueDate: newTask.dueDate ? `${newTask.dueDate}T${newTask.dueTime || '09:00'}` : '' },
       })
     }
-    setNewTask({ text: '', dueDate: '' })
+    setNewTask({ text: '', dueDate: '', dueTime: '09:00' })
     setShowAddModal(false)
   }
 
@@ -126,11 +126,35 @@ export default function TasksPanel({ roomId }) {
               className="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
             />
             <input
-              type="datetime-local"
+              type="date"
               value={newTask.dueDate}
               onChange={e => setNewTask(prev => ({ ...prev, dueDate: e.target.value }))}
               className="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
             />
+            {newTask.dueDate && (() => {
+              const t = newTask.dueTime || '09:00'
+              const [h, m] = t.split(':').map(Number)
+              const parsed = { hour: h % 12 || 12, minute: isNaN(m) ? 0 : m, period: h >= 12 ? 'PM' : 'AM' }
+              const update = (hr, mn, p) => {
+                let h24 = hr % 12; if (p === 'PM') h24 += 12
+                setNewTask(prev => ({ ...prev, dueTime: `${String(h24).padStart(2, '0')}:${String(mn).padStart(2, '0')}` }))
+              }
+              return (
+                <div className="flex items-center gap-2">
+                  <select value={parsed.hour} onChange={e => update(Number(e.target.value), parsed.minute, parsed.period)} className="h-10 px-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:border-indigo-500 bg-white text-center w-16">
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(h => <option key={h} value={h}>{String(h).padStart(2, '0')}</option>)}
+                  </select>
+                  <span className="text-gray-400 font-bold">:</span>
+                  <select value={parsed.minute} onChange={e => update(parsed.hour, Number(e.target.value), parsed.period)} className="h-10 px-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:border-indigo-500 bg-white text-center w-16">
+                    {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => <option key={m} value={m}>{String(m).padStart(2, '0')}</option>)}
+                  </select>
+                  <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                    <button type="button" onClick={() => update(parsed.hour, parsed.minute, 'AM')} className={`px-2.5 h-10 text-xs font-semibold transition-colors ${parsed.period === 'AM' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>AM</button>
+                    <button type="button" onClick={() => update(parsed.hour, parsed.minute, 'PM')} className={`px-2.5 h-10 text-xs font-semibold transition-colors ${parsed.period === 'PM' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>PM</button>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
           <div className="flex gap-2 mt-4 justify-end">
             <button onClick={() => setShowAddModal(false)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">
