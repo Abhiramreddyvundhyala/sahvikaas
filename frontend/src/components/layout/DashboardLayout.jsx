@@ -78,7 +78,7 @@ export default function DashboardLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-[#eeeeee]">
       {/* Mobile overlay */}
       {isMobile && sidebarOpen && (
         <div
@@ -94,12 +94,12 @@ export default function DashboardLayout() {
             ? `fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
             : 'w-64 shrink-0'
           }
-          bg-white border-r border-gray-200 flex flex-col
+          bg-[#F2CF7E] border-r border-[#e0bd6c] flex flex-col
         `}
       >
         <div className="p-4 sm:p-6 flex items-center justify-between">
           <h1
-            className="logo-font text-2xl text-indigo-500 cursor-pointer"
+            className="logo-font text-2xl text-black cursor-pointer"
             onClick={() => { navigate('/'); setSidebarOpen(false) }}
           >
             StudyHub
@@ -107,9 +107,9 @@ export default function DashboardLayout() {
           {isMobile && (
             <button
               onClick={() => setSidebarOpen(false)}
-              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors"
+              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[#e0bd6c] transition-colors"
             >
-              <i className="ri-close-line text-xl text-gray-500" />
+              <i className="ri-close-line text-xl text-black" />
             </button>
           )}
         </div>
@@ -124,8 +124,8 @@ export default function DashboardLayout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-indigo-50 text-indigo-600'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    ? 'bg-white text-black shadow-sm'
+                    : 'text-black/80 hover:bg-[#e0bd6c] hover:text-black'
                 }`
               }
             >
@@ -135,19 +135,19 @@ export default function DashboardLayout() {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-gray-200">
+        <div className="p-3 border-t border-[#e0bd6c]">
           <button
             onClick={() => { navigate('/profile'); setSidebarOpen(false) }}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg hover:bg-gray-100 transition-colors"
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg hover:bg-[#e0bd6c] transition-colors"
           >
-            <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center">
-              <span className="text-sm font-bold text-indigo-600">
+            <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center">
+              <span className="text-sm font-bold text-black">
                 {user?.name ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : 'U'}
               </span>
             </div>
             <div className="text-left min-w-0 flex-1">
-              <p className="text-sm font-medium text-gray-900 truncate">{user?.name || 'Guest'}</p>
-              <p className="text-xs text-gray-500 truncate">{user?.major || user?.email || ''}</p>
+              <p className="text-sm font-medium text-black truncate">{user?.name || 'Guest'}</p>
+              <p className="text-xs text-black/70 truncate">{user?.major || user?.email || ''}</p>
             </div>
           </button>
         </div>
@@ -156,22 +156,22 @@ export default function DashboardLayout() {
       {/* Main area */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Header */}
-        <header className="h-14 sm:h-16 bg-white border-b border-gray-200 flex items-center justify-between px-3 sm:px-6 shrink-0">
+        <header className="h-14 sm:h-16 bg-white border-b border-gray-100 flex items-center justify-between px-3 sm:px-6 shrink-0">
           <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
             {isMobile && (
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors shrink-0"
+                className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-colors shrink-0"
               >
-                <i className="ri-menu-line text-xl text-gray-600" />
+                <i className="ri-menu-line text-xl text-gray-700" />
               </button>
             )}
             <div className="relative flex-1 max-w-xs sm:max-w-sm lg:max-w-md">
-              <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
               <input
                 type="text"
                 placeholder="Search..."
-                className="w-full h-9 sm:h-10 pl-10 pr-4 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                className="w-full h-9 sm:h-10 pl-10 pr-4 rounded-lg border border-gray-200 text-sm text-black placeholder-gray-500 focus:outline-none focus:border-[#F2CF7E] focus:ring-1 focus:ring-[#F2CF7E]"
               />
             </div>
           </div>
@@ -179,28 +179,28 @@ export default function DashboardLayout() {
             <div className="relative" ref={notifRef}>
               <button
                 onClick={toggleNotifications}
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors relative"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-colors relative"
               >
-                <i className="ri-notification-3-line text-lg sm:text-xl text-gray-600" />
+                <i className="ri-notification-3-line text-lg sm:text-xl text-gray-700" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 sm:top-1.5 right-1 sm:right-1.5 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
+                  <span className="absolute top-1 sm:top-1.5 right-1 sm:right-1.5 min-w-[18px] h-[18px] flex items-center justify-center bg-[#F2CF7E] text-black text-[10px] font-bold rounded-full px-1">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
               </button>
               {notifOpen && (
-                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border border-gray-200 shadow-xl z-50 overflow-hidden">
+                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border border-gray-100 shadow-xl z-50 overflow-hidden">
                   <div className="flex items-center justify-between p-3 border-b border-gray-100">
-                    <h4 className="text-sm font-semibold text-gray-900">Notifications</h4>
+                    <h4 className="text-sm font-semibold text-black">Notifications</h4>
                     {unreadCount > 0 && (
-                      <button onClick={markAllRead} className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+                      <button onClick={markAllRead} className="text-xs text-[#F2CF7E] hover:text-[#e0bd6c] font-medium transition-colors">
                         Mark all read
                       </button>
                     )}
                   </div>
                   <div className="max-h-72 overflow-y-auto">
                     {notifications.length === 0 ? (
-                      <p className="text-sm text-gray-400 text-center py-8">No notifications</p>
+                      <p className="text-sm text-gray-500 text-center py-8">No notifications</p>
                     ) : (
                       notifications.slice(0, 15).map(n => (
                         <div
@@ -208,15 +208,15 @@ export default function DashboardLayout() {
                           onClick={() => {
                             if (n.roomId) { navigate(`/room/${n.roomId}`); setNotifOpen(false) }
                           }}
-                          className={`px-3 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer ${!n.read ? 'bg-indigo-50/50' : ''}`}
+                          className={`px-3 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer ${!n.read ? 'bg-[#F2CF7E]/5' : ''}`}
                         >
                           <div className="flex items-start gap-2">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${!n.read ? 'bg-indigo-100' : 'bg-gray-100'}`}>
-                              <i className={`ri-team-line text-sm ${!n.read ? 'text-indigo-600' : 'text-gray-500'}`} />
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${!n.read ? 'bg-[#F2CF7E]/20' : 'bg-gray-100'}`}>
+                              <i className={`ri-team-line text-sm ${!n.read ? 'text-[#F2CF7E]' : 'text-gray-600'}`} />
                             </div>
                             <div className="min-w-0">
-                              <p className={`text-sm ${!n.read ? 'font-medium text-gray-900' : 'text-gray-600'}`}>{n.message || n.title}</p>
-                              <p className="text-xs text-gray-400 mt-0.5">{new Date(n.createdAt).toLocaleString()}</p>
+                              <p className={`text-sm ${!n.read ? 'font-medium text-black' : 'text-gray-700'}`}>{n.message || n.title}</p>
+                              <p className="text-xs text-gray-500 mt-0.5">{new Date(n.createdAt).toLocaleString()}</p>
                             </div>
                           </div>
                         </div>
@@ -226,8 +226,8 @@ export default function DashboardLayout() {
                 </div>
               )}
             </div>
-            <button className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors">
-              <i className="ri-settings-3-line text-lg sm:text-xl text-gray-600" />
+            <button className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-colors">
+              <i className="ri-settings-3-line text-lg sm:text-xl text-gray-700" />
             </button>
           </div>
         </header>

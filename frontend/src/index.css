@@ -15,7 +15,11 @@
 
   body {
     font-family: 'Inter', sans-serif;
-    @apply bg-gray-50 text-gray-900 antialiased m-0;
+    background-color: #eeeeee;
+    color: #000000;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    margin: 0;
     overflow-x: hidden;
   }
 

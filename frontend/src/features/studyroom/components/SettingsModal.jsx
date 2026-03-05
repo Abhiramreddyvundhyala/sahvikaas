@@ -87,8 +87,8 @@ export default function SettingsModal({ isOpen, onClose, roomId }) {
               )}
               {participants.map((p) => (
                 <div key={p.socketId} className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
-                  <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center relative">
-                    <span className="text-sm font-medium text-indigo-600">{(p.name || '?').charAt(0).toUpperCase()}</span>
+                  <div className="w-9 h-9 rounded-full bg-[#F2CF7E]/20 flex items-center justify-center relative">
+                    <span className="text-sm font-medium text-black">{(p.name || '?').charAt(0).toUpperCase()}</span>
                     <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
                   </div>
                   <div className="flex-1">
@@ -110,14 +110,14 @@ export default function SettingsModal({ isOpen, onClose, roomId }) {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Microphone</label>
-                <select className="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                <select className="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#F2CF7E]">
                   <option>Default Microphone</option>
                   <option>External Microphone</option>
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Speaker</label>
-                <select className="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                <select className="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#F2CF7E]">
                   <option>Default Speaker</option>
                   <option>External Speaker</option>
                 </select>
@@ -128,7 +128,7 @@ export default function SettingsModal({ isOpen, onClose, roomId }) {
           {activeTab === 'Video' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Camera</label>
-              <select className="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+              <select className="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#F2CF7E]">
                 <option>Default Camera</option>
                 <option>External Webcam</option>
               </select>
@@ -143,7 +143,7 @@ export default function SettingsModal({ isOpen, onClose, roomId }) {
                   type="checkbox"
                   checked={waitingRoom}
                   onChange={e => setWaitingRoom(e.target.checked)}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-gray-300 text-black focus:ring-[#F2CF7E]"
                 />
               </label>
               <label className="flex items-center justify-between p-3 border border-gray-200 rounded-lg cursor-pointer">
@@ -152,7 +152,7 @@ export default function SettingsModal({ isOpen, onClose, roomId }) {
                   type="checkbox"
                   checked={screenSharing}
                   onChange={e => setScreenSharing(e.target.checked)}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-gray-300 text-black focus:ring-[#F2CF7E]"
                 />
               </label>
             </div>
@@ -162,3 +162,4 @@ export default function SettingsModal({ isOpen, onClose, roomId }) {
     </Modal>
   )
 }
+

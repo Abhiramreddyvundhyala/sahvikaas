@@ -120,7 +120,7 @@ export default function ChatPanel({ roomId, userName }) {
           <div className="flex flex-col items-center justify-center h-full text-gray-400 py-8">
             <i className="ri-chat-3-line text-3xl" />
             <p className="text-sm mt-2">No messages yet</p>
-            <p className="text-xs mt-1">Start chatting or type <span className="font-medium text-indigo-500">@AI</span> to ask the assistant</p>
+            <p className="text-xs mt-1">Start chatting or type <span className="font-medium text-[#F2CF7E]">@AI</span> to ask the assistant</p>
           </div>
         )}
         {messages.map((msg, i) => {
@@ -138,19 +138,19 @@ export default function ChatPanel({ roomId, userName }) {
           return (
             <div key={msg.id || i} className="flex gap-2">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-medium ${
-                isAI ? 'bg-indigo-100 text-indigo-600' : isSelf ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'
+                isAI ? 'bg-[#F2CF7E]/20 text-black' : isSelf ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'
               }`}>
                 {isAI ? <i className="ri-robot-line text-sm" /> : (msg.initials || msg.user?.slice(0, 2)?.toUpperCase() || 'U')}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className="text-sm font-medium text-gray-900">{msg.user || 'User'}</span>
-                  {isSelf && <span className="px-1.5 py-0 text-[10px] bg-indigo-100 text-indigo-600 rounded font-medium">You</span>}
+                  {isSelf && <span className="px-1.5 py-0 text-[10px] bg-[#F2CF7E]/20 text-black rounded font-medium">You</span>}
                   {isAI && <span className="px-1.5 py-0 text-[10px] bg-green-100 text-green-600 rounded font-medium">AI</span>}
                   <span className="text-[10px] text-gray-400">{msg.time}</span>
                 </div>
                 <div className={`rounded-lg px-3 py-2 text-sm ${
-                  isAI ? 'bg-indigo-50 border border-indigo-100 text-gray-700'
+                  isAI ? 'bg-[#F2CF7E]/10 border border-indigo-100 text-gray-700'
                     : isSelf ? 'bg-blue-50 border border-blue-100 text-gray-700'
                     : 'bg-gray-50 border border-gray-100 text-gray-700'
                 }`}>
@@ -162,10 +162,10 @@ export default function ChatPanel({ roomId, userName }) {
         })}
         {isAiReplying && (
           <div className="flex gap-2">
-            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-              <i className="ri-robot-line text-sm text-indigo-600" />
+            <div className="w-8 h-8 rounded-full bg-[#F2CF7E]/20 flex items-center justify-center shrink-0">
+              <i className="ri-robot-line text-sm text-black" />
             </div>
-            <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 flex gap-1">
+            <div className="bg-[#F2CF7E]/10 border border-indigo-100 rounded-lg px-3 py-2 flex gap-1">
               <div className="typing-dot" /><div className="typing-dot" /><div className="typing-dot" />
             </div>
           </div>
@@ -185,12 +185,12 @@ export default function ChatPanel({ roomId, userName }) {
             value={input}
             onChange={handleInputChange}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
-            className="w-full h-10 pl-4 pr-12 rounded-full border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full h-10 pl-4 pr-12 rounded-full border border-gray-200 text-sm focus:outline-none focus:border-[#F2CF7E] focus:ring-1 focus:ring-[#F2CF7E]"
           />
           <button
             onClick={handleSend}
             disabled={!input.trim()}
-            className="absolute right-1 top-1 w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center hover:bg-indigo-700 transition-colors disabled:bg-gray-200 disabled:text-gray-400"
+            className="absolute right-1 top-1 w-8 h-8 bg-[#F2CF7E] text-white rounded-full flex items-center justify-center hover:bg-[#e0bd6c] transition-colors disabled:bg-gray-200 disabled:text-gray-400"
           >
             <i className="ri-send-plane-fill text-xs" />
           </button>
@@ -199,3 +199,4 @@ export default function ChatPanel({ roomId, userName }) {
     </div>
   )
 }
+

@@ -8,9 +8,6 @@ const aiTools = [
     name: 'Study Assistant',
     desc: 'Get instant help with any topic. Ask questions, get explanations, and learn concepts faster.',
     icon: 'ri-chat-smile-2-line',
-    color: 'from-indigo-500 to-purple-500',
-    bg: 'bg-indigo-50',
-    text: 'text-indigo-600',
     action: 'Start Conversation',
     category: 'learn',
     route: '/ai-tools/assistant',
@@ -20,9 +17,6 @@ const aiTools = [
     name: 'Quiz Generator',
     desc: 'Create custom practice tests from any topic. Choose difficulty, number of questions, and format.',
     icon: 'ri-question-answer-line',
-    color: 'from-teal-500 to-emerald-500',
-    bg: 'bg-teal-50',
-    text: 'text-teal-600',
     action: 'Generate Quiz',
     category: 'practice',
     route: '/ai-tools/quiz',
@@ -32,9 +26,6 @@ const aiTools = [
     name: 'Study Plan Creator',
     desc: 'AI generates a personalized weekly study plan based on your exams and available hours.',
     icon: 'ri-calendar-todo-line',
-    color: 'from-blue-500 to-cyan-500',
-    bg: 'bg-blue-50',
-    text: 'text-blue-600',
     action: 'Create Plan',
     category: 'organize',
     route: '/ai-tools/tool/study-planner',
@@ -44,9 +35,6 @@ const aiTools = [
     name: 'Notes Summarizer',
     desc: 'Paste or upload your notes and get a concise summary with highlighted key terms.',
     icon: 'ri-file-text-line',
-    color: 'from-amber-500 to-orange-500',
-    bg: 'bg-amber-50',
-    text: 'text-amber-600',
     action: 'Summarize Notes',
     category: 'learn',
     route: '/ai-tools/summarizer',
@@ -56,9 +44,6 @@ const aiTools = [
     name: 'Flashcard Generator',
     desc: 'Auto-create flashcards from any content. Flip-card UI with spaced repetition learning.',
     icon: 'ri-stack-line',
-    color: 'from-pink-500 to-rose-500',
-    bg: 'bg-pink-50',
-    text: 'text-pink-600',
     action: 'Create Flashcards',
     category: 'practice',
     route: '/ai-tools/flashcards',
@@ -68,9 +53,6 @@ const aiTools = [
     name: 'Doubt Solver',
     desc: 'Ask any academic doubt and get step-by-step solutions with visual explanations.',
     icon: 'ri-lightbulb-line',
-    color: 'from-yellow-500 to-amber-500',
-    bg: 'bg-yellow-50',
-    text: 'text-yellow-600',
     action: 'Ask Doubt',
     category: 'learn',
     route: '/ai-tools/tool/doubt-solver',
@@ -80,9 +62,6 @@ const aiTools = [
     name: 'Exam Predictor',
     desc: 'Predict important questions from past papers using AI pattern analysis.',
     icon: 'ri-bar-chart-grouped-line',
-    color: 'from-violet-500 to-purple-500',
-    bg: 'bg-violet-50',
-    text: 'text-violet-600',
     action: 'Predict Questions',
     category: 'practice',
     route: '/ai-tools/tool/exam-predictor',
@@ -92,9 +71,6 @@ const aiTools = [
     name: 'Assignment Helper',
     desc: 'Structure and draft assignments with AI. Outline → Draft → Review workflow.',
     icon: 'ri-edit-2-line',
-    color: 'from-emerald-500 to-green-500',
-    bg: 'bg-emerald-50',
-    text: 'text-emerald-600',
     action: 'Start Writing',
     category: 'create',
     route: '/ai-tools/tool/assignment-helper',
@@ -104,9 +80,6 @@ const aiTools = [
     name: 'Explain Like I\'m 5',
     desc: 'Simplify complex topics into easy language. Adjust the complexity level with a slider.',
     icon: 'ri-emotion-happy-line',
-    color: 'from-orange-500 to-red-500',
-    bg: 'bg-orange-50',
-    text: 'text-orange-600',
     action: 'Simplify Topic',
     category: 'learn',
     route: '/ai-tools/tool/eli5',
@@ -116,9 +89,6 @@ const aiTools = [
     name: 'Formula Sheet Generator',
     desc: 'Generate comprehensive formula sheets for any subject. Printable & downloadable.',
     icon: 'ri-functions',
-    color: 'from-cyan-500 to-blue-500',
-    bg: 'bg-cyan-50',
-    text: 'text-cyan-600',
     action: 'Generate Sheet',
     category: 'create',
     route: '/ai-tools/tool/formula-sheet',
@@ -128,9 +98,6 @@ const aiTools = [
     name: 'Voice Notes to Text',
     desc: 'Convert recorded lectures to formatted text notes. Upload audio and get organized notes.',
     icon: 'ri-mic-line',
-    color: 'from-rose-500 to-pink-500',
-    bg: 'bg-rose-50',
-    text: 'text-rose-600',
     action: 'Convert Audio',
     category: 'create',
     route: '/ai-tools/tool/voice-to-text',
@@ -140,9 +107,6 @@ const aiTools = [
     name: 'Lab Report Writer',
     desc: 'Generate lab report templates with AI. Pre-filled structure per experiment type.',
     icon: 'ri-test-tube-line',
-    color: 'from-slate-500 to-gray-600',
-    bg: 'bg-slate-50',
-    text: 'text-slate-600',
     action: 'Write Report',
     category: 'create',
     route: '/ai-tools/tool/lab-report',
@@ -164,19 +128,30 @@ function ToolCard({ tool, onLaunch }) {
   const navigate = useNavigate()
   
   return (
-    <div className="group bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${tool.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-        <i className={`${tool.icon} text-2xl text-white`} />
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+      {/* Icon at top - Gold theme */}
+      <div className="p-5 pb-3">
+        <div className="w-12 h-12 rounded-xl bg-[#F2CF7E] flex items-center justify-center">
+          <i className={`${tool.icon} text-2xl text-black`} />
+        </div>
       </div>
-      <h3 className="font-semibold text-gray-900 mb-1">{tool.name}</h3>
-      <p className="text-sm text-gray-500 mb-4 line-clamp-2">{tool.desc}</p>
-      <button
-        onClick={() => navigate(tool.route)}
-        className={`w-full py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r ${tool.color} text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2`}
-      >
-        <i className="ri-play-circle-line" />
-        {tool.action}
-      </button>
+      
+      {/* Content */}
+      <div className="px-5 pb-4 flex-1 flex flex-col">
+        <h3 className="font-semibold text-gray-900 mb-2">{tool.name}</h3>
+        <p className="text-sm text-gray-600 mb-4 flex-1">{tool.desc}</p>
+      </div>
+      
+      {/* Button at bottom - Gold theme */}
+      <div className="p-5 pt-0">
+        <button
+          onClick={() => navigate(tool.route)}
+          className="w-full py-2.5 rounded-lg text-sm font-semibold bg-[#F2CF7E] text-black hover:bg-[#e0bd6c] transition-colors flex items-center justify-center gap-2"
+        >
+          <i className="ri-arrow-right-line" />
+          {tool.action}
+        </button>
+      </div>
     </div>
   )
 }
@@ -202,17 +177,37 @@ export default function AIToolsPage() {
       </div>
 
       {/* Hero Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 rounded-2xl p-6 sm:p-8 text-white">
-        <div className="relative z-10">
-          <h2 className="text-lg sm:text-2xl font-bold mb-2">Supercharge Your Studies with AI</h2>
-          <p className="text-sm sm:text-base text-white/80 max-w-lg">
-            12 powerful AI tools designed to help you learn faster, practice smarter, and create better study materials.
-          </p>
+      <div className="bg-[#F2CF7E] rounded-2xl p-6 sm:p-8 border border-[#e0bd6c]">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-10 h-10 rounded-lg bg-black/10 flex items-center justify-center">
+            <i className="ri-sparkling-2-fill text-xl text-black" />
+          </div>
+          <span className="text-xs font-bold text-black/70 uppercase tracking-wider">AI-Powered Learning</span>
         </div>
-        {/* Decorative circles */}
-        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10" />
-        <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-white/10" />
-        <div className="absolute top-1/2 right-1/4 w-16 h-16 rounded-full bg-white/5" />
+        <h2 className="text-xl sm:text-3xl font-bold text-black mb-3">Supercharge Your Studies with AI</h2>
+        <p className="text-sm sm:text-base text-black/80 max-w-2xl mb-4">
+          12 powerful AI tools designed to help you learn faster, practice smarter, and create better study materials.
+        </p>
+        <div className="flex flex-wrap gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-black/10 flex items-center justify-center">
+              <i className="ri-check-line text-black font-bold" />
+            </div>
+            <span className="text-black/90 font-medium">Instant Results</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-black/10 flex items-center justify-center">
+              <i className="ri-check-line text-black font-bold" />
+            </div>
+            <span className="text-black/90 font-medium">Smart Learning</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-black/10 flex items-center justify-center">
+              <i className="ri-check-line text-black font-bold" />
+            </div>
+            <span className="text-black/90 font-medium">24/7 Available</span>
+          </div>
+        </div>
       </div>
 
       {/* How It Works */}
@@ -220,15 +215,15 @@ export default function AIToolsPage() {
         <h3 className="font-semibold text-gray-900 mb-4 text-center">How It Works</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { step: '1', title: 'Choose a Tool', desc: 'Pick from 12 AI-powered tools', icon: 'ri-cursor-line', color: 'from-indigo-500 to-purple-500' },
-            { step: '2', title: 'Provide Input', desc: 'Enter your topic, question, or content', icon: 'ri-keyboard-line', color: 'from-teal-500 to-emerald-500' },
-            { step: '3', title: 'Get Results', desc: 'Receive AI-generated study materials', icon: 'ri-sparkle-line', color: 'from-amber-500 to-orange-500' },
+            { step: '1', title: 'Choose a Tool', desc: 'Pick from 12 AI-powered tools', icon: 'ri-cursor-line' },
+            { step: '2', title: 'Provide Input', desc: 'Enter your topic, question, or content', icon: 'ri-keyboard-line' },
+            { step: '3', title: 'Get Results', desc: 'Receive AI-generated study materials', icon: 'ri-sparkle-line' },
           ].map(s => (
             <div key={s.step} className="flex flex-col items-center text-center p-4">
-              <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${s.color} flex items-center justify-center mb-3`}>
-                <i className={`${s.icon} text-xl text-white`} />
+              <div className="w-12 h-12 rounded-full bg-[#F2CF7E] flex items-center justify-center mb-3">
+                <i className={`${s.icon} text-xl text-black`} />
               </div>
-              <div className="text-xs font-bold text-indigo-600 mb-1">STEP {s.step}</div>
+              <div className="text-xs font-bold text-black mb-1">STEP {s.step}</div>
               <h4 className="font-semibold text-gray-900 text-sm">{s.title}</h4>
               <p className="text-xs text-gray-500 mt-1">{s.desc}</p>
             </div>
@@ -245,7 +240,7 @@ export default function AIToolsPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search AI tools..."
-            className="w-full h-10 pl-10 pr-4 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full h-10 pl-10 pr-4 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#F2CF7E] focus:ring-1 focus:ring-[#F2CF7E]"
           />
         </div>
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto study-feature-tabs">
@@ -280,3 +275,4 @@ export default function AIToolsPage() {
     </div>
   )
 }
+

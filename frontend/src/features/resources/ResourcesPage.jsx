@@ -178,7 +178,7 @@ function ResourceModal({ resource, folderId, onClose, onSave }) {
           {!resource && (
             <div
               className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
-                dragOver ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-gray-400'
+                dragOver ? 'border-[#F2CF7E] bg-[#F2CF7E]/10' : 'border-gray-300 hover:border-gray-400'
               }`}
               onDragOver={e => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
@@ -194,8 +194,8 @@ function ResourceModal({ resource, folderId, onClose, onSave }) {
               />
               {file ? (
                 <div className="flex items-center justify-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-indigo-50 flex items-center justify-center">
-                    <i className="ri-file-line text-2xl text-indigo-600" />
+                  <div className="w-12 h-12 rounded-lg bg-[#F2CF7E]/10 flex items-center justify-center">
+                    <i className="ri-file-line text-2xl text-black" />
                   </div>
                   <div className="text-left">
                     <p className="text-sm font-medium text-gray-900">{file.name}</p>
@@ -206,7 +206,7 @@ function ResourceModal({ resource, folderId, onClose, onSave }) {
                 <>
                   <i className="ri-upload-cloud-2-line text-4xl text-gray-400" />
                   <p className="text-sm text-gray-600 mt-3">
-                    <span className="text-indigo-600 font-medium">Click to upload</span> or drag and drop
+                    <span className="text-black font-medium">Click to upload</span> or drag and drop
                   </p>
                   <p className="text-xs text-gray-400 mt-1">PDF, DOC, PPT, VIDEO, IMAGE (max 50MB)</p>
                 </>
@@ -222,7 +222,7 @@ function ResourceModal({ resource, folderId, onClose, onSave }) {
               value={formData.title}
               onChange={e => setFormData({ ...formData, title: e.target.value })}
               placeholder="Resource name"
-              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#F2CF7E] focus:ring-1 focus:ring-[#F2CF7E]"
             />
           </div>
 
@@ -231,7 +231,7 @@ function ResourceModal({ resource, folderId, onClose, onSave }) {
             <select
               value={formData.type}
               onChange={e => setFormData({ ...formData, type: e.target.value })}
-              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 bg-white"
+              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#F2CF7E] bg-white"
             >
               {RESOURCE_TYPES.map(t => (
                 <option key={t.value} value={t.value}>{t.value}</option>
@@ -246,7 +246,7 @@ function ResourceModal({ resource, folderId, onClose, onSave }) {
               value={formData.tags}
               onChange={e => setFormData({ ...formData, tags: e.target.value })}
               placeholder="e.g. important, exam, chapter-5"
-              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500"
+              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#F2CF7E]"
             />
             <p className="text-xs text-gray-500 mt-1">Separate tags with commas</p>
           </div>
@@ -262,7 +262,7 @@ function ResourceModal({ resource, folderId, onClose, onSave }) {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 py-2.5 bg-[#F2CF7E] text-black text-sm font-medium rounded-lg hover:bg-[#e0bd6c] disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -328,7 +328,7 @@ function FolderModal({ folder, parentId, onClose, onSave }) {
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
               placeholder="e.g. Semester 5"
-              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500"
+              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#F2CF7E]"
             />
           </div>
 
@@ -354,7 +354,7 @@ function FolderModal({ folder, parentId, onClose, onSave }) {
               onChange={e => setFormData({ ...formData, description: e.target.value })}
               placeholder="Optional description..."
               rows={2}
-              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 resize-none"
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#F2CF7E] resize-none"
             />
           </div>
 
@@ -369,7 +369,7 @@ function FolderModal({ folder, parentId, onClose, onSave }) {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              className="flex-1 py-2.5 bg-[#F2CF7E] text-black text-sm font-medium rounded-lg hover:bg-[#e0bd6c] disabled:opacity-50"
             >
               {loading ? 'Saving...' : folder ? 'Update' : 'Create'}
             </button>
@@ -392,7 +392,7 @@ function ResourceGridCard({ resource, onEdit, onDelete, onToggleFavorite, onOpen
             <i className={`${resource.icon || typeInfo.icon} text-xl`} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-gray-900 text-sm truncate group-hover:text-indigo-600 transition-colors">
+            <h3 className="font-semibold text-gray-900 text-sm truncate group-hover:text-black transition-colors">
               {resource.title}
             </h3>
             {resource.subject && <p className="text-xs text-gray-500 mt-0.5">{resource.subject}</p>}
@@ -408,7 +408,7 @@ function ResourceGridCard({ resource, onEdit, onDelete, onToggleFavorite, onOpen
         {resource.tags && resource.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-3">
             {resource.tags.slice(0, 3).map((tag, i) => (
-              <span key={i} className="text-xs px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full">
+              <span key={i} className="text-xs px-2 py-0.5 bg-[#F2CF7E]/10 text-black rounded-full">
                 {tag}
               </span>
             ))}
@@ -539,7 +539,7 @@ function FolderCard({ folder, onOpen, onEdit, onDelete, resourceCount }) {
           <i className={`${folder.icon} text-xl`} />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-gray-900 text-sm truncate group-hover:text-indigo-600 transition-colors">
+          <h3 className="font-semibold text-gray-900 text-sm truncate group-hover:text-black transition-colors">
             {folder.name}
           </h3>
           <p className="text-xs text-gray-500 mt-0.5">{resourceCount} items</p>
@@ -730,7 +730,7 @@ export default function ResourcesPage() {
           <p className="text-gray-500 mb-4">Please log in to access your resources</p>
           <a
             href="/auth"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[#F2CF7E] text-black text-sm font-medium rounded-lg hover:bg-[#e0bd6c] transition-colors"
           >
             <i className="ri-login-line" />
             Go to Login
@@ -744,8 +744,8 @@ export default function ResourcesPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-500">Loading resources...</p>
+          <div className="w-8 h-8 border-3 border-[#F2CF7E] border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-gray-600">Loading resources...</p>
         </div>
       </div>
     )
@@ -769,7 +769,7 @@ export default function ResourcesPage() {
           </button>
           <button
             onClick={handleCreateResource}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#F2CF7E] text-black text-sm font-medium rounded-lg hover:bg-[#e0bd6c] transition-colors"
           >
             <i className="ri-add-line" />
             Add Resource
@@ -781,7 +781,7 @@ export default function ResourcesPage() {
       <div className="flex items-center gap-2 text-sm">
         <button
           onClick={() => handleNavigateToFolder(-1)}
-          className="text-gray-600 hover:text-indigo-600 transition-colors flex items-center gap-1"
+          className="text-gray-600 hover:text-black transition-colors flex items-center gap-1"
         >
           <i className="ri-home-4-line" />
           Home
@@ -791,7 +791,7 @@ export default function ResourcesPage() {
             <i className="ri-arrow-right-s-line text-gray-400" />
             <button
               onClick={() => handleNavigateToFolder(index)}
-              className="text-gray-600 hover:text-indigo-600 transition-colors"
+              className="text-gray-600 hover:text-black transition-colors"
             >
               {folder.name}
             </button>
@@ -808,7 +808,7 @@ export default function ResourcesPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search resources..."
-            className="w-full h-10 pl-10 pr-4 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full h-10 pl-10 pr-4 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#F2CF7E] focus:ring-1 focus:ring-[#F2CF7E]"
           />
         </div>
         
@@ -874,8 +874,8 @@ export default function ResourcesPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
-              <i className="ri-folder-line text-indigo-600" />
+            <div className="w-8 h-8 rounded-lg bg-[#F2CF7E]/10 flex items-center justify-center">
+              <i className="ri-folder-line text-black" />
             </div>
             <div>
               <p className="text-xs text-gray-500">Folders</p>
@@ -927,7 +927,7 @@ export default function ResourcesPage() {
           </p>
           <button
             onClick={handleCreateResource}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-[#F2CF7E] text-black text-sm font-medium rounded-lg hover:bg-[#e0bd6c]"
           >
             <i className="ri-add-line" />
             Add Your First Resource
@@ -1031,3 +1031,4 @@ export default function ResourcesPage() {
     </div>
   )
 }
+

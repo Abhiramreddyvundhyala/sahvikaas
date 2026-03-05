@@ -86,7 +86,7 @@ export default function ResourcesPanel({ roomId }) {
         <div className="px-3 py-2 border-b border-gray-100">
           <button
             onClick={() => setPreviewFile(null)}
-            className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700"
+            className="flex items-center gap-1 text-sm text-black hover:text-[#e0bd6c]"
           >
             <i className="ri-arrow-left-s-line" />
             Back to Files
@@ -123,7 +123,7 @@ export default function ResourcesPanel({ roomId }) {
       <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin">
         {/* Breadcrumb */}
         <div className="text-xs text-gray-500">
-          <button onClick={() => setCurrentFolder(null)} className="hover:text-indigo-600">Home</button>
+          <button onClick={() => setCurrentFolder(null)} className="hover:text-black">Home</button>
           {currentFolder && (
             <>
               <span className="mx-1">/</span>
@@ -214,14 +214,14 @@ export default function ResourcesPanel({ roomId }) {
               placeholder="Title"
               value={uploadForm.title}
               onChange={e => setUploadForm(prev => ({ ...prev, title: e.target.value }))}
-              className="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+              className="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#F2CF7E]"
             />
             <input
               type="text"
               placeholder="Description (optional)"
               value={uploadForm.description}
               onChange={e => setUploadForm(prev => ({ ...prev, description: e.target.value }))}
-              className="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+              className="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#F2CF7E]"
             />
             <input
               type="file"
@@ -234,7 +234,7 @@ export default function ResourcesPanel({ roomId }) {
             <button onClick={() => setShowUploadModal(false)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">
               Cancel
             </button>
-            <button onClick={handleUpload} className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+            <button onClick={handleUpload} className="px-3 py-1.5 text-sm bg-[#F2CF7E] text-white rounded-lg hover:bg-[#e0bd6c]">
               Upload
             </button>
           </div>
@@ -251,13 +251,13 @@ export default function ResourcesPanel({ roomId }) {
             value={newFolderName}
             onChange={e => setNewFolderName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && createFolder()}
-            className="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+            className="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#F2CF7E]"
           />
           <div className="flex gap-2 mt-4 justify-end">
             <button onClick={() => setShowFolderModal(false)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">
               Cancel
             </button>
-            <button onClick={createFolder} className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+            <button onClick={createFolder} className="px-3 py-1.5 text-sm bg-[#F2CF7E] text-white rounded-lg hover:bg-[#e0bd6c]">
               Create
             </button>
           </div>
@@ -266,3 +266,4 @@ export default function ResourcesPanel({ roomId }) {
     </div>
   )
 }
+
