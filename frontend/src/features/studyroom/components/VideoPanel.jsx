@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { connectSocket, getSocket } from '../../../lib/socket'
 import { getWebRtcIceConfig } from '../../../lib/api'
 
@@ -32,6 +32,7 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
   const [connected, setConnected] = useState(false)
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState('')
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   const localVideoRef = useRef(null)
   const localStreamRef = useRef(null)
@@ -79,7 +80,7 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
         }
 
         activeMeetingRef.current = meetingId
-        // Use the shared socket (connected by StudyRoomPage) — do NOT own the socket lifecycle
+        // Use the shared socket (connected by StudyRoomPage) � do NOT own the socket lifecycle
         const socket = getSocket()
         if (!socket?.connected) connectSocket()
         socketRef.current = socket || getSocket()
@@ -334,7 +335,32 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
   const totalParticipants = participants.size + 1
   const gridCols = totalParticipants <= 1 ? 1 : totalParticipants <= 4 ? 2 : totalParticipants <= 9 ? 3 : 4
 
-  // ========== RENDER — pure video display only ==========
+  // ========== Fullscreen ==========
+  const toggleFullscreen = () => {
+    if (!panelRef.current) return
+    
+    if (!document.fullscreenElement) {
+      panelRef.current.requestFullscreen().then(() => {
+        setIsFullscreen(true)
+      }).catch(err => {
+        console.error('Fullscreen error:', err)
+      })
+    } else {
+      document.exitFullscreen().then(() => {
+        setIsFullscreen(false)
+      })
+    }
+  }
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
+
+  // ========== RENDER � pure video display only ==========
   return (
     <div ref={panelRef} className="flex flex-col h-full overflow-hidden bg-gray-900">
       {/* Minimal status bar */}
@@ -346,12 +372,21 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
             {connecting ? 'Connecting...' : connected ? totalParticipants + (totalParticipants === 1 ? ' participant' : ' participants') : 'Waiting...'}
           </span>
         </div>
-        {connected && (
-          <div className="flex items-center gap-1 text-[10px] text-gray-500">
-            <i className="ri-shield-check-line text-green-500" />
-            Encrypted
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {connected && (
+            <div className="flex items-center gap-1 text-[10px] text-gray-500">
+              <i className="ri-shield-check-line text-green-500" />
+              Encrypted
+            </div>
+          )}
+          <button
+            onClick={toggleFullscreen}
+            className="w-7 h-7 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors"
+            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+          >
+            <i className={`${isFullscreen ? 'ri-fullscreen-exit-line' : 'ri-fullscreen-line'} text-gray-400 text-sm`} />
+          </button>
+        </div>
       </div>
 
       {/* Error */}
@@ -370,10 +405,10 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
         >
           {/* Local video (you) */}
           <div className="relative rounded-lg overflow-hidden bg-gray-800 min-h-0">
-            <video ref={localVideoRef} autoPlay playsInline muted className={'w-full h-full object-cover' + (!isVideoOn ? ' hidden' : '')} />
+            <video ref={localVideoRef} autoPlay playsInline muted className={'w-full h-full object-cover' + (!isVideoOn ? ' hidden' : '')} style={{ transform: 'scaleX(-1)' }} />
             {!isVideoOn && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-                <div className="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center text-white text-lg font-bold">
+                <div className="w-12 h-12 rounded-full bg-[#F2CF7E] flex items-center justify-center text-black text-lg font-bold">
                   {userNameRef.current.charAt(0).toUpperCase()}
                 </div>
               </div>
@@ -381,7 +416,7 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
             {connecting && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-800/60">
                 <div className="flex flex-col items-center gap-2">
-                  <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-8 h-8 border-2 border-[#F2CF7E] border-t-transparent rounded-full animate-spin" />
                   <span className="text-xs text-gray-300">Connecting...</span>
                 </div>
               </div>
@@ -418,7 +453,7 @@ function RemoteVideo({ participant }) {
       )}
       {(!participant.stream || participant.videoOn === false) && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-          <div className="w-12 h-12 rounded-full bg-emerald-600 flex items-center justify-center text-white text-lg font-bold">
+          <div className="w-12 h-12 rounded-full bg-emerald-600 flex items-center justify-center text-black text-lg font-bold">
             {(participant.name || '?').charAt(0).toUpperCase()}
           </div>
         </div>
@@ -432,3 +467,4 @@ function RemoteVideo({ participant }) {
     </div>
   )
 }
+

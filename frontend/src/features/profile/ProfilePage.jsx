@@ -85,11 +85,11 @@ export default function ProfilePage() {
 
       {/* Profile Header Card */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-        {/* Gradient banner */}
-        <div className="h-32 bg-gradient-to-r from-indigo-500 to-purple-600 relative">
+        {/* Banner */}
+        <div className="h-32 bg-[#F2CF7E] relative">
           <div className="absolute -bottom-12 left-6">
             <div className="w-24 h-24 rounded-full bg-white border-4 border-white shadow-lg flex items-center justify-center">
-              <span className="text-2xl font-bold text-indigo-600">{initials}</span>
+              <span className="text-2xl font-bold text-[#F2CF7E]">{initials}</span>
             </div>
           </div>
         </div>
@@ -110,7 +110,7 @@ export default function ProfilePage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setEditing(!editing)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 border border-gray-300 text-black rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
               >
                 <i className={editing ? 'ri-close-line' : 'ri-pencil-line'} />
                 {editing ? 'Cancel' : 'Edit Profile'}
@@ -149,7 +149,7 @@ export default function ProfilePage() {
                 type="text"
                 value={form.name}
                 onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                className="w-full h-11 px-4 rounded-lg border border-gray-300 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                className="w-full h-11 px-4 rounded-lg border border-gray-300 text-sm text-black placeholder-gray-500 focus:outline-none focus:border-[#F2CF7E] focus:ring-1 focus:ring-[#F2CF7E]"
               />
             </div>
             <div>
@@ -168,7 +168,7 @@ export default function ProfilePage() {
                 placeholder="e.g. MIT, Stanford"
                 value={form.institution}
                 onChange={e => setForm(p => ({ ...p, institution: e.target.value }))}
-                className="w-full h-11 px-4 rounded-lg border border-gray-300 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                className="w-full h-11 px-4 rounded-lg border border-gray-300 text-sm text-black placeholder-gray-500 focus:outline-none focus:border-[#F2CF7E] focus:ring-1 focus:ring-[#F2CF7E]"
               />
             </div>
             <div>
@@ -178,7 +178,7 @@ export default function ProfilePage() {
                 placeholder="e.g. Computer Science"
                 value={form.major}
                 onChange={e => setForm(p => ({ ...p, major: e.target.value }))}
-                className="w-full h-11 px-4 rounded-lg border border-gray-300 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                className="w-full h-11 px-4 rounded-lg border border-gray-300 text-sm text-black placeholder-gray-500 focus:outline-none focus:border-[#F2CF7E] focus:ring-1 focus:ring-[#F2CF7E]"
               />
             </div>
           </div>
@@ -190,14 +190,14 @@ export default function ProfilePage() {
               placeholder="Tell others about yourself..."
               value={form.bio}
               onChange={e => setForm(p => ({ ...p, bio: e.target.value }))}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-none"
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm text-black placeholder-gray-500 focus:outline-none focus:border-[#F2CF7E] focus:ring-1 focus:ring-[#F2CF7E] resize-none"
             />
           </div>
 
           <div className="flex justify-end">
             <button
               onClick={handleSave}
-              className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-1.5"
+              className="px-6 py-2.5 bg-[#F2CF7E] text-black rounded-lg text-sm font-semibold hover:bg-[#e0bd6c] transition-colors flex items-center gap-1.5"
             >
               <i className="ri-save-line" />
               Save Changes
@@ -209,10 +209,10 @@ export default function ProfilePage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Rooms Created', value: myRooms.length, icon: 'ri-video-chat-line', color: 'text-indigo-600 bg-indigo-50' },
-          { label: 'Member Since', value: new Date(user.joinedAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), icon: 'ri-calendar-line', color: 'text-green-600 bg-green-50' },
-          { label: 'Study Hours', value: stats.totalStudyHours || 0, icon: 'ri-time-line', color: 'text-orange-600 bg-orange-50' },
-          { label: 'Total XP', value: (stats.totalXP || 0).toLocaleString(), icon: 'ri-trophy-line', color: 'text-purple-600 bg-purple-50' },
+          { label: 'Rooms Created', value: myRooms.length, icon: 'ri-video-chat-line', color: 'text-[#F2CF7E] bg-[#F2CF7E]/10' },
+          { label: 'Member Since', value: new Date(user.joinedAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), icon: 'ri-calendar-line', color: 'text-[#F2CF7E] bg-[#F2CF7E]/10' },
+          { label: 'Study Hours', value: stats.totalStudyHours || 0, icon: 'ri-time-line', color: 'text-[#F2CF7E] bg-[#F2CF7E]/10' },
+          { label: 'Total XP', value: (stats.totalXP || 0).toLocaleString(), icon: 'ri-trophy-line', color: 'text-[#F2CF7E] bg-[#F2CF7E]/10' },
         ].map(stat => (
           <div key={stat.label} className="bg-white border border-gray-200 rounded-lg p-4 text-center">
             <div className={`w-10 h-10 rounded-lg ${stat.color} flex items-center justify-center mx-auto mb-2`}>
@@ -230,7 +230,7 @@ export default function ProfilePage() {
           <h2 className="font-semibold text-gray-900">My Rooms</h2>
           <button
             onClick={() => navigate('/create-room')}
-            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+            className="text-sm text-[#F2CF7E] hover:text-[#e0bd6c] font-medium flex items-center gap-1 transition-colors"
           >
             <i className="ri-add-line" />
             Create Room
@@ -244,7 +244,7 @@ export default function ProfilePage() {
             <p className="text-sm text-gray-500">You haven't created any rooms yet.</p>
             <button
               onClick={() => navigate('/create-room')}
-              className="mt-3 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+              className="mt-3 px-4 py-2 bg-[#F2CF7E] text-black text-sm font-semibold rounded-lg hover:bg-[#e0bd6c] transition-colors"
             >
               Create Your First Room
             </button>
@@ -263,7 +263,7 @@ export default function ProfilePage() {
                   </span>
                   <button
                     onClick={() => navigate(`/room/${room.id}`)}
-                    className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                    className="px-3 py-1.5 bg-[#F2CF7E] text-black text-xs font-semibold rounded-lg hover:bg-[#e0bd6c] transition-colors"
                   >
                     Enter
                   </button>

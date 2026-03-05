@@ -19,7 +19,7 @@ router.post('/assistant', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Message is required' })
     }
     
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
     
     // Filter and format history - must start with 'user' role
     const formattedHistory = history
@@ -71,7 +71,7 @@ router.post('/quiz', authMiddleware, upload.single('pdf'), async (req, res) => {
       content = pdfData.text.substring(0, 5000)
     }
     
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
     const prompt = `Generate ${numQuestions} ${difficulty} difficulty multiple-choice questions about: ${content}
 
 Format as JSON array:
@@ -98,7 +98,7 @@ Format as JSON array:
 router.post('/study-plan', authMiddleware, async (req, res) => {
   try {
     const { exams, hoursPerDay, subjects } = req.body
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
     
     const prompt = `Create a detailed weekly study plan:
 - Exams: ${JSON.stringify(exams)}
@@ -136,7 +136,7 @@ router.post('/summarize', authMiddleware, upload.single('pdf'), async (req, res)
       content = pdfData.text
     }
     
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
     const prompt = `Summarize these notes concisely with key points and important terms highlighted:
 
 ${content.substring(0, 10000)}
@@ -166,7 +166,7 @@ Format:
 router.post('/flashcards', authMiddleware, async (req, res) => {
   try {
     const { topic, content, count = 10 } = req.body
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
     
     const prompt = `Generate ${count} flashcards for: ${topic}
 ${content ? `Content: ${content.substring(0, 3000)}` : ''}
@@ -194,7 +194,7 @@ Format as JSON array:
 router.post('/doubt-solver', authMiddleware, async (req, res) => {
   try {
     const { question, subject } = req.body
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
     
     const prompt = `Solve this ${subject} question with step-by-step explanation:
 
@@ -220,7 +220,7 @@ Provide:
 router.post('/exam-predictor', authMiddleware, async (req, res) => {
   try {
     const { subject, topics, examType } = req.body
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
     
     const prompt = `Predict important questions for ${examType} exam in ${subject}:
 Topics: ${topics.join(', ')}
@@ -252,7 +252,7 @@ Format as JSON:
 router.post('/assignment', authMiddleware, async (req, res) => {
   try {
     const { topic, requirements, wordCount, stage } = req.body
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
     
     let prompt = ''
     if (stage === 'outline') {
@@ -288,7 +288,7 @@ Suggest improvements for: clarity, structure, grammar, academic tone`
 router.post('/eli5', authMiddleware, async (req, res) => {
   try {
     const { topic, complexity = 5 } = req.body
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
     
     const levels = {
       1: 'a 5-year-old child with simple words and analogies',
@@ -320,7 +320,7 @@ Use:
 router.post('/formula-sheet', authMiddleware, async (req, res) => {
   try {
     const { subject, topics } = req.body
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
     
     const prompt = `Generate a comprehensive formula sheet for ${subject}:
 Topics: ${topics.join(', ')}
@@ -348,7 +348,7 @@ Format in organized sections with clear headings`
 router.post('/voice-to-text', authMiddleware, async (req, res) => {
   try {
     const { transcript, subject } = req.body
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
     
     const prompt = `Convert this lecture transcript into organized notes for ${subject}:
 
@@ -380,7 +380,7 @@ Include:
 router.post('/lab-report', authMiddleware, async (req, res) => {
   try {
     const { experimentType, observations, data } = req.body
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
     
     const prompt = `Generate a lab report for: ${experimentType}
 

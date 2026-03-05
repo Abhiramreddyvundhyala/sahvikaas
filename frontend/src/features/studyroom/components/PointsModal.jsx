@@ -48,7 +48,7 @@ export default function PointsModal({ isOpen, onClose, roomId, userName }) {
             onClick={() => setActiveTab('breakdown')}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'breakdown'
-                ? 'border-indigo-600 text-indigo-600'
+                ? 'border-[#F2CF7E] text-black'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -58,7 +58,7 @@ export default function PointsModal({ isOpen, onClose, roomId, userName }) {
             onClick={() => setActiveTab('leaderboard')}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'leaderboard'
-                ? 'border-indigo-600 text-indigo-600'
+                ? 'border-[#F2CF7E] text-black'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -70,7 +70,7 @@ export default function PointsModal({ isOpen, onClose, roomId, userName }) {
         {activeTab === 'breakdown' && (
           <div className="space-y-3">
             <div className="text-center py-3">
-              <p className="text-3xl font-bold text-indigo-600">{totalPoints}</p>
+              <p className="text-3xl font-bold text-black">{totalPoints}</p>
               <p className="text-sm text-gray-500">Total Points</p>
             </div>
             {pointsBreakdown.length === 0 && (
@@ -83,7 +83,7 @@ export default function PointsModal({ isOpen, onClose, roomId, userName }) {
             {pointsBreakdown.map((item, i) => (
               <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <span className="text-sm text-gray-700">{item.label}</span>
-                <span className="text-sm font-semibold text-indigo-600">+{item.points}</span>
+                <span className="text-sm font-semibold text-black">+{item.points}</span>
               </div>
             ))}
           </div>
@@ -104,7 +104,7 @@ export default function PointsModal({ isOpen, onClose, roomId, userName }) {
                 <div
                   key={user.rank}
                   className={`flex items-center gap-3 p-3 rounded-lg ${
-                    isSelf ? 'bg-indigo-50 border border-indigo-200' : 'bg-gray-50'
+                    isSelf ? 'bg-[#F2CF7E]/10 border border-[#F2CF7E]/30' : 'bg-gray-50'
                   }`}
                 >
                   <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
@@ -118,7 +118,7 @@ export default function PointsModal({ isOpen, onClose, roomId, userName }) {
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900">
                       {user.name}
-                      {isSelf && <span className="ml-2 text-xs text-indigo-600">(You)</span>}
+                      {isSelf && <span className="ml-2 text-xs text-black">(You)</span>}
                     </p>
                   </div>
                   <span className="text-sm font-semibold text-gray-700">{user.points} pts</span>
@@ -131,3 +131,4 @@ export default function PointsModal({ isOpen, onClose, roomId, userName }) {
     </Modal>
   )
 }
+

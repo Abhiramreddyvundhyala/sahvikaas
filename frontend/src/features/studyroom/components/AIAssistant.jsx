@@ -61,7 +61,7 @@ export default function AIAssistant() {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-full bg-[#F2CF7E] flex items-center justify-center">
             <i className="ri-robot-line text-xs text-white" />
           </div>
           <h3 className="text-sm font-semibold text-gray-800">AI Study Assistant</h3>
@@ -78,7 +78,7 @@ export default function AIAssistant() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center py-8">
-            <div className="w-14 h-14 rounded-full bg-indigo-50 flex items-center justify-center mb-3">
+            <div className="w-14 h-14 rounded-full bg-[#F2CF7E]/10 flex items-center justify-center mb-3">
               <i className="ri-robot-line text-2xl text-indigo-400" />
             </div>
             <p className="text-sm font-medium text-gray-600">AI Study Assistant</p>
@@ -88,12 +88,12 @@ export default function AIAssistant() {
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'gap-2'}`}>
             {msg.role === 'ai' && (
-              <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+              <div className="w-7 h-7 rounded-full bg-[#F2CF7E] flex items-center justify-center shrink-0 mt-0.5">
                 <i className="ri-robot-line text-xs text-white" />
               </div>
             )}
             <div className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
-              msg.role === 'ai' ? 'bg-gray-50 text-gray-700 border border-gray-100' : 'bg-indigo-600 text-white'
+              msg.role === 'ai' ? 'bg-gray-50 text-gray-700 border border-gray-100' : 'bg-[#F2CF7E] text-white'
             }`}>
               <div className="whitespace-pre-wrap leading-relaxed">
                 {msg.role === 'ai' ? renderContent(msg.content) : msg.content}
@@ -103,7 +103,7 @@ export default function AIAssistant() {
         ))}
         {isTyping && (
           <div className="flex gap-2">
-            <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center shrink-0">
+            <div className="w-7 h-7 rounded-full bg-[#F2CF7E] flex items-center justify-center shrink-0">
               <i className="ri-robot-line text-xs text-white" />
             </div>
             <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 flex gap-1">
@@ -124,12 +124,12 @@ export default function AIAssistant() {
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
             disabled={isTyping}
-            className="flex-1 h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-50"
+            className="flex-1 h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#F2CF7E] focus:ring-1 focus:ring-[#F2CF7E] disabled:bg-gray-50"
           />
           <button
             onClick={handleSend}
             disabled={!input.trim() || isTyping}
-            className="w-10 h-10 bg-indigo-600 text-white rounded-lg flex items-center justify-center hover:bg-indigo-700 transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed shrink-0"
+            className="w-10 h-10 bg-[#F2CF7E] text-white rounded-lg flex items-center justify-center hover:bg-[#e0bd6c] transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed shrink-0"
           >
             <i className={isTyping ? 'ri-loader-4-line animate-spin text-sm' : 'ri-send-plane-fill text-sm'} />
           </button>
@@ -138,3 +138,4 @@ export default function AIAssistant() {
     </div>
   )
 }
+

@@ -177,7 +177,7 @@ export default function NotesPanel({ roomId }) {
               className="w-full h-8 pl-7 pr-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400"
             />
           </div>
-          <button onClick={handleNew} className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700" title="New note">
+          <button onClick={handleNew} className="w-8 h-8 rounded-lg bg-[#F2CF7E] text-white flex items-center justify-center hover:bg-[#e0bd6c]" title="New note">
             <i className="ri-add-line" />
           </button>
         </div>
@@ -191,7 +191,7 @@ export default function NotesPanel({ roomId }) {
             <div
               key={note.id}
               onClick={() => openNote(note)}
-              className={`px-3 py-2.5 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition ${activeNote?.id === note.id ? 'bg-indigo-50 border-l-2 border-l-indigo-500' : ''}`}
+              className={`px-3 py-2.5 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition ${activeNote?.id === note.id ? 'bg-[#F2CF7E]/10 border-l-2 border-l-indigo-500' : ''}`}
             >
               <div className="flex items-center justify-between">
                 <h5 className="text-xs font-medium text-gray-800 truncate flex-1">{note.title}</h5>
@@ -216,7 +216,7 @@ export default function NotesPanel({ roomId }) {
             <div className="text-center">
               <i className="ri-file-text-line text-3xl" />
               <p className="text-sm mt-2">Select a note or create a new one</p>
-              <button onClick={handleNew} className="mt-3 text-xs px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">
+              <button onClick={handleNew} className="mt-3 text-xs px-3 py-1.5 rounded-lg bg-[#F2CF7E] text-white hover:bg-[#e0bd6c]">
                 <i className="ri-add-line mr-1" /> New Note
               </button>
             </div>
@@ -234,7 +234,7 @@ export default function NotesPanel({ roomId }) {
               />
               <button
                 onClick={activeNote ? updateNote : createNote}
-                className="text-xs px-2.5 py-1 rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
+                className="text-xs px-2.5 py-1 rounded-md bg-[#F2CF7E] text-white hover:bg-[#e0bd6c]"
               >
                 {activeNote ? 'Save' : 'Create'}
               </button>
@@ -266,8 +266,8 @@ export default function NotesPanel({ roomId }) {
                   disabled={isEnhancing || !content.trim()}
                   className={`text-[10px] px-2 py-1 rounded-md border flex items-center gap-1 transition ${
                     isEnhancing && enhanceType === btn.type
-                      ? 'border-indigo-300 bg-indigo-50 text-indigo-600'
-                      : 'border-gray-200 text-gray-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600'
+                      ? 'border-indigo-300 bg-[#F2CF7E]/10 text-black'
+                      : 'border-gray-200 text-gray-600 hover:bg-[#F2CF7E]/10 hover:border-[#F2CF7E]/30 hover:text-black'
                   } disabled:opacity-40`}
                 >
                   <i className={`${btn.icon} ${isEnhancing && enhanceType === btn.type ? 'animate-spin' : ''}`} />
@@ -287,7 +287,7 @@ export default function NotesPanel({ roomId }) {
               />
               {isEnhancing && (
                 <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                  <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-50 text-indigo-600 text-sm">
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#F2CF7E]/10 text-black text-sm">
                     <i className="ri-loader-4-line animate-spin" />
                     AI is enhancing your notes...
                   </div>
@@ -306,3 +306,4 @@ export default function NotesPanel({ roomId }) {
     </div>
   )
 }
+

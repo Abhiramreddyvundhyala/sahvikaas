@@ -324,15 +324,15 @@ export default function StudyRoomPage() {
   return (
     <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
       {/* Top Navigation Bar */}
-      <nav className="study-nav bg-white border-b border-gray-200 px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-between shrink-0 z-10 relative">
+      <nav className="study-nav bg-[#F2CF7E] border-b border-[#e0bd6c] px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-between shrink-0 z-10 relative">
         {/* Left: User */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-indigo-100 flex items-center justify-center">
-            <i className="ri-user-line text-lg sm:text-xl text-indigo-600" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/30 flex items-center justify-center">
+            <i className="ri-user-line text-lg sm:text-xl text-black" />
           </div>
           <div className="hidden xs:block">
-            <h3 className="font-medium text-gray-900 text-sm">{userName}</h3>
-            <div className="flex items-center gap-1 text-xs text-gray-500">
+            <h3 className="font-medium text-black text-sm">{userName}</h3>
+            <div className="flex items-center gap-1 text-xs text-black/70">
               <span className="w-2 h-2 bg-green-500 rounded-full" />
               Online
             </div>
@@ -343,24 +343,24 @@ export default function StudyRoomPage() {
         {/* Center: Room */}
         <div className="study-nav-center text-center min-w-0">
           {roomInfoLoading ? (
-            <h2 className="text-sm sm:text-base font-semibold text-gray-900 truncate">Loading...</h2>
+            <h2 className="text-sm sm:text-base font-semibold text-black truncate">Loading...</h2>
           ) : roomInfoError ? (
             <>
               <h2 className="text-sm sm:text-base font-semibold text-red-600 truncate">Room not found</h2>
-              <p className="text-xs text-gray-500">Redirecting to rooms...</p>
+              <p className="text-xs text-black/70">Redirecting to rooms...</p>
             </>
           ) : hasEnded ? (
             <>
               <h2 className="text-sm sm:text-base font-semibold text-orange-600 truncate">{roomInfo.name || 'Study Room'} (Ended)</h2>
-              <p className="text-xs text-gray-500">This room has been closed</p>
+              <p className="text-xs text-black/70">This room has been closed</p>
             </>
           ) : (
             <>
-              <h2 className="text-sm sm:text-base font-semibold text-gray-900 truncate">{roomInfo.name || 'Study Room'}</h2>
-              <p className="text-xs text-gray-500 truncate">{roomInfo.subject}</p>
+              <h2 className="text-sm sm:text-base font-semibold text-black truncate">{roomInfo.name || 'Study Room'}</h2>
+              <p className="text-xs text-black/70 truncate">{roomInfo.subject}</p>
             </>
           )}
-          <p className="text-[10px] sm:text-xs text-gray-500">
+          <p className="text-[10px] sm:text-xs text-black/70">
             Room #{id || '—'} · {hasEnded ? `${lastParticipantCount} last online` : `${participantCount} online`}
           </p>
         </div>
@@ -369,44 +369,44 @@ export default function StudyRoomPage() {
         <div className="hidden md:flex items-center gap-2 lg:gap-3 shrink-0">
           <div
             onClick={() => setPointsOpen(true)}
-            className="flex items-center bg-indigo-50 px-2 lg:px-3 py-1.5 rounded-full cursor-pointer hover:bg-indigo-100 transition-colors"
+            className="flex items-center bg-white/30 px-2 lg:px-3 py-1.5 rounded-full cursor-pointer hover:bg-white/40 transition-colors"
           >
-            <i className="ri-coins-line text-indigo-600 mr-1 lg:mr-1.5 text-sm" />
-            <span className="font-semibold text-indigo-600 text-sm">{totalPoints}</span>
+            <i className="ri-coins-line text-black mr-1 lg:mr-1.5 text-sm" />
+            <span className="font-semibold text-black text-sm">{totalPoints}</span>
           </div>
 
           <button
             onClick={() => setVoiceOpen(v => !v)}
             className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
-              voiceOpen ? 'bg-indigo-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+              voiceOpen ? 'bg-white text-black' : 'bg-white/20 hover:bg-white/30 text-black'
             }`}
             title="Voice Assistant"
           >
             <i className="ri-robot-2-line" />
           </button>
 
-          <button onClick={() => setSettingsOpen(true)} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
-            <i className="ri-settings-3-line text-gray-600" />
+          <button onClick={() => setSettingsOpen(true)} className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
+            <i className="ri-settings-3-line text-black" />
           </button>
 
-          <div className="w-px h-6 bg-gray-200" />
+          <div className="w-px h-6 bg-black/20" />
 
           <div className="flex gap-1.5">
             <button
               onClick={() => setIsMicOn(!isMicOn)}
-              className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${isMicOn ? 'bg-gray-100 hover:bg-gray-200 text-gray-600' : 'bg-red-100 text-red-600'}`}
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${isMicOn ? 'bg-white/20 hover:bg-white/30 text-black' : 'bg-red-100 text-red-600'}`}
             >
               <i className={isMicOn ? 'ri-mic-line' : 'ri-mic-off-line'} />
             </button>
             <button
               onClick={() => setIsVideoOn(!isVideoOn)}
-              className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${isVideoOn ? 'bg-gray-100 hover:bg-gray-200 text-gray-600' : 'bg-red-100 text-red-600'}`}
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${isVideoOn ? 'bg-white/20 hover:bg-white/30 text-black' : 'bg-red-100 text-red-600'}`}
             >
               <i className={isVideoOn ? 'ri-vidicon-line' : 'ri-vidicon-off-line'} />
             </button>
             <button
               onClick={() => setIsScreenSharing(!isScreenSharing)}
-              className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${isScreenSharing ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${isScreenSharing ? 'bg-blue-100 text-blue-600' : 'bg-white/20 hover:bg-white/30 text-black'}`}
             >
               <i className="ri-computer-line" />
             </button>
@@ -473,31 +473,31 @@ export default function StudyRoomPage() {
 
       {/* Mobile: Expanded controls dropdown */}
       {controlsExpanded && isMobile && (
-        <div className="md:hidden bg-white border-b border-gray-200 px-3 py-2 flex items-center justify-center gap-2 shrink-0 z-10 animate-slide-down">
+        <div className="md:hidden bg-[#F2CF7E] border-b border-[#e0bd6c] px-3 py-2 flex items-center justify-center gap-2 shrink-0 z-10 animate-slide-down">
           <div
             onClick={() => { setPointsOpen(true); setControlsExpanded(false) }}
-            className="flex items-center bg-indigo-50 px-2.5 py-1.5 rounded-full cursor-pointer hover:bg-indigo-100 transition-colors"
+            className="flex items-center bg-white/30 px-2.5 py-1.5 rounded-full cursor-pointer hover:bg-white/40 transition-colors"
           >
-            <i className="ri-coins-line text-indigo-600 mr-1 text-sm" />
-            <span className="font-semibold text-indigo-600 text-sm">{totalPoints}</span>
+            <i className="ri-coins-line text-black mr-1 text-sm" />
+            <span className="font-semibold text-black text-sm">{totalPoints}</span>
           </div>
           <button
             onClick={() => { setVoiceOpen(v => !v); setControlsExpanded(false) }}
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-              voiceOpen ? 'bg-indigo-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+              voiceOpen ? 'bg-white text-black' : 'bg-white/20 hover:bg-white/30 text-black'
             }`}
           >
             <i className="ri-robot-2-line text-sm" />
           </button>
           <button
             onClick={() => { setSettingsOpen(true); setControlsExpanded(false) }}
-            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200"
+            className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30"
           >
-            <i className="ri-settings-3-line text-gray-600 text-sm" />
+            <i className="ri-settings-3-line text-black text-sm" />
           </button>
           <button
             onClick={() => { setIsScreenSharing(!isScreenSharing); setControlsExpanded(false) }}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isScreenSharing ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isScreenSharing ? 'bg-blue-100 text-blue-600' : 'bg-white/20 text-black'}`}
           >
             <i className="ri-computer-line text-sm" />
           </button>
@@ -521,7 +521,7 @@ export default function StudyRoomPage() {
                       onClick={() => setActiveFeature(tab.id)}
                       className={`flex items-center gap-1 px-3 py-2 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${
                         activeFeature === tab.id
-                          ? 'border-indigo-600 text-indigo-600 bg-white'
+                          ? 'border-[#F2CF7E] text-black bg-white'
                           : 'border-transparent text-gray-500 hover:text-gray-700'
                       }`}
                     >
@@ -545,7 +545,7 @@ export default function StudyRoomPage() {
                 onClick={() => setMobilePanel(tab.id)}
                 className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] sm:text-xs font-medium transition-colors ${
                   mobilePanel === tab.id
-                    ? 'text-indigo-600 bg-indigo-50'
+                    ? 'text-black bg-[#F2CF7E]/10'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
@@ -572,9 +572,9 @@ export default function StudyRoomPage() {
             {/* Horizontal Resize Handle */}
             <div
               onMouseDown={startHorizontalDrag}
-              className="h-1.5 bg-gray-100 hover:bg-indigo-300 cursor-row-resize flex items-center justify-center shrink-0 transition-colors group"
+              className="h-1.5 bg-gray-100 hover:bg-[#F2CF7E]/50 cursor-row-resize flex items-center justify-center shrink-0 transition-colors group"
             >
-              <div className="w-10 h-0.5 bg-gray-300 rounded-full group-hover:bg-indigo-500 transition-colors" />
+              <div className="w-10 h-0.5 bg-gray-300 rounded-full group-hover:bg-[#F2CF7E]/100 transition-colors" />
             </div>
 
             {/* Bottom: AI Assistant */}
@@ -586,9 +586,9 @@ export default function StudyRoomPage() {
           {/* Vertical Resize Handle */}
           <div
             onMouseDown={startVerticalDrag}
-            className="w-1.5 bg-gray-100 hover:bg-indigo-300 cursor-col-resize flex items-center justify-center shrink-0 transition-colors group"
+            className="w-1.5 bg-gray-100 hover:bg-[#F2CF7E]/50 cursor-col-resize flex items-center justify-center shrink-0 transition-colors group"
           >
-            <div className="h-10 w-0.5 bg-gray-300 rounded-full group-hover:bg-indigo-500 transition-colors" />
+            <div className="h-10 w-0.5 bg-gray-300 rounded-full group-hover:bg-[#F2CF7E]/100 transition-colors" />
           </div>
 
           {/* RIGHT HALF: AI Features */}
@@ -601,7 +601,7 @@ export default function StudyRoomPage() {
                   onClick={() => setActiveFeature(tab.id)}
                   className={`flex items-center gap-1.5 px-3 lg:px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${
                     activeFeature === tab.id
-                      ? 'border-indigo-600 text-indigo-600 bg-white'
+                      ? 'border-[#F2CF7E] text-black bg-white'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
                   }`}
                 >
@@ -628,3 +628,4 @@ export default function StudyRoomPage() {
     </div>
   )
 }
+

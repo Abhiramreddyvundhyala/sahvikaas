@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { generateQuiz, submitQuizResult } from '../../../lib/api'
+import { generateQuiz } from '../../../lib/api'
 
 export default function QuizGeneratorPanel() {
   const [file, setFile] = useState(null)
@@ -63,7 +63,7 @@ export default function QuizGeneratorPanel() {
     }
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (timerRef.current) clearInterval(timerRef.current)
     let correct = 0
     questions.forEach((q, i) => {
@@ -71,10 +71,6 @@ export default function QuizGeneratorPanel() {
     })
     setScore({ correct, total: questions.length })
     setStage('results')
-    // Submit quiz result for badge tracking
-    try {
-      await submitQuizResult(correct, questions.length)
-    } catch { /* ignore */ }
   }
 
   const resetQuiz = () => {
@@ -116,7 +112,7 @@ export default function QuizGeneratorPanel() {
                 type="file"
                 accept=".pdf"
                 onChange={handleFileUpload}
-                className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100"
+                className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#F2CF7E]/10 file:text-black hover:file:bg-[#F2CF7E]/20"
               />
               {file && (
                 <p className="text-xs text-green-600 font-medium mt-1">
@@ -138,7 +134,7 @@ export default function QuizGeneratorPanel() {
                 value={topic}
                 onChange={e => setTopic(e.target.value)}
                 placeholder="e.g., Data Structures, Photosynthesis..."
-                className="w-full h-9 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                className="w-full h-9 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#F2CF7E]"
               />
             </div>
 
@@ -149,7 +145,7 @@ export default function QuizGeneratorPanel() {
                   type="number" min={5} max={20}
                   value={numQuestions}
                   onChange={e => setNumQuestions(Math.min(20, Math.max(5, Number(e.target.value))))}
-                  className="w-full h-9 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                  className="w-full h-9 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#F2CF7E]"
                 />
               </div>
               <div>
@@ -158,14 +154,14 @@ export default function QuizGeneratorPanel() {
                   type="number" min={5} max={60}
                   value={timeMinutes}
                   onChange={e => setTimeMinutes(Math.min(60, Math.max(5, Number(e.target.value))))}
-                  className="w-full h-9 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                  className="w-full h-9 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#F2CF7E]"
                 />
               </div>
             </div>
 
             <button
               onClick={startQuiz}
-              className="w-full py-2.5 text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-2.5 text-sm font-medium rounded-lg text-white bg-[#F2CF7E] hover:bg-[#e0bd6c] transition-colors flex items-center justify-center gap-2"
             >
               <i className="ri-questionnaire-line" />
               Generate Quiz with AI
@@ -176,7 +172,7 @@ export default function QuizGeneratorPanel() {
         {/* Loading Stage */}
         {stage === 'loading' && (
           <div className="text-center py-12">
-            <i className="ri-loader-4-line animate-spin text-3xl text-indigo-500" />
+            <i className="ri-loader-4-line animate-spin text-3xl text-[#F2CF7E]" />
             <p className="text-sm text-gray-600 mt-3">Generating quiz questions with AI...</p>
             <p className="text-xs text-gray-400 mt-1">This may take a moment</p>
           </div>
@@ -194,7 +190,7 @@ export default function QuizGeneratorPanel() {
               </div>
               <div className="w-full bg-gray-200 rounded-full h-1 mt-1.5">
                 <div
-                  className="bg-indigo-600 h-1 rounded-full transition-all"
+                  className="bg-[#F2CF7E] h-1 rounded-full transition-all"
                   style={{ width: `${(Object.keys(answers).length / questions.length) * 100}%` }}
                 />
               </div>
@@ -210,14 +206,14 @@ export default function QuizGeneratorPanel() {
                     <label
                       key={oi}
                       className={`flex items-center gap-2 p-2 rounded-lg text-sm cursor-pointer transition-colors ${
-                        answers[qi] === oi ? 'bg-indigo-50 border border-indigo-200' : 'hover:bg-gray-50 border border-transparent'
+                        answers[qi] === oi ? 'bg-[#F2CF7E]/10 border border-[#F2CF7E]/30' : 'hover:bg-gray-50 border border-transparent'
                       }`}
                     >
                       <input
                         type="radio" name={`q${qi}`}
                         checked={answers[qi] === oi}
                         onChange={() => setAnswers(prev => ({ ...prev, [qi]: oi }))}
-                        className="text-indigo-600 focus:ring-indigo-500"
+                        className="text-black focus:ring-[#F2CF7E]"
                       />
                       <span>{String.fromCharCode(65 + oi)}. {opt}</span>
                     </label>
@@ -228,7 +224,7 @@ export default function QuizGeneratorPanel() {
 
             <button
               onClick={handleSubmit}
-              className="w-full py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+              className="w-full py-2.5 bg-[#F2CF7E] text-white text-sm font-medium rounded-lg hover:bg-[#e0bd6c] transition-colors"
             >
               Submit Quiz
             </button>
@@ -272,7 +268,7 @@ export default function QuizGeneratorPanel() {
               )
             })}
 
-            <button onClick={resetQuiz} className="w-full py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+            <button onClick={resetQuiz} className="w-full py-2.5 bg-[#F2CF7E] text-white text-sm font-medium rounded-lg hover:bg-[#e0bd6c] transition-colors">
               Take Another Quiz
             </button>
           </div>
@@ -281,3 +277,4 @@ export default function QuizGeneratorPanel() {
     </div>
   )
 }
+

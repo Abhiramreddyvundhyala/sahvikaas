@@ -145,7 +145,7 @@ export default function VoiceAssistant({ isOpen, onToggle }) {
   return (
     <div className="fixed top-14 right-2 sm:right-4 w-[min(350px,calc(100vw-1rem))] max-h-[min(500px,calc(100vh-8rem))] bg-white rounded-xl shadow-2xl border border-gray-200 flex flex-col z-40 overflow-hidden">
       {/* Header */}
-      <div className="bg-indigo-600 px-4 py-3 flex items-center justify-between shrink-0">
+      <div className="bg-[#F2CF7E] px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <h4 className="text-sm font-semibold text-white">AI Voice Assistant</h4>
           <span className="text-[10px] px-1.5 py-0.5 bg-white/20 text-white rounded-full">Gemini</span>
@@ -171,7 +171,7 @@ export default function VoiceAssistant({ isOpen, onToggle }) {
             ) : (
               <div className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
                 msg.role === 'user'
-                  ? 'bg-indigo-600 text-white rounded-br-none'
+                  ? 'bg-[#F2CF7E] text-white rounded-br-none'
                   : 'bg-gray-100 text-gray-700 rounded-bl-none'
               }`}>
                 {msg.content}
@@ -245,3 +245,4 @@ export default function VoiceAssistant({ isOpen, onToggle }) {
     </div>
   )
 }
+

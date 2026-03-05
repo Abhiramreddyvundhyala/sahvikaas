@@ -434,7 +434,7 @@ export default function VideoPanelSFU({ meetingId, isMicOn, isVideoOn, isScreenS
             <video ref={localVideoRef} autoPlay playsInline muted className={'w-full h-full object-cover' + (!isVideoOn ? ' hidden' : '')} />
             {!isVideoOn && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-                <div className="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center text-white text-lg font-bold">
+                <div className="w-12 h-12 rounded-full bg-[#F2CF7E] flex items-center justify-center text-white text-lg font-bold">
                   {userNameRef.current.charAt(0).toUpperCase()}
                 </div>
               </div>
@@ -514,3 +514,4 @@ function RemoteVideo({ participant, peerId }) {
     </div>
   )
 }
+

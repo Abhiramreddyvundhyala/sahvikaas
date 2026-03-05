@@ -107,7 +107,7 @@ export default function PdfSummarizerPanel() {
 
         {processing && (
           <div className="text-center py-12">
-            <i className="ri-loader-4-line animate-spin text-3xl text-indigo-500" />
+            <i className="ri-loader-4-line animate-spin text-3xl text-[#F2CF7E]" />
             <p className="text-sm text-gray-600 mt-3">{processingMsg}</p>
             <p className="text-xs text-gray-400 mt-1">This may take a moment depending on PDF size...</p>
           </div>
@@ -121,7 +121,7 @@ export default function PdfSummarizerPanel() {
                 <h4 className="text-sm font-semibold text-gray-700">{file?.name || 'Document Summary'}</h4>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={copySummary} className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
+                <button onClick={copySummary} className="text-xs text-black hover:text-[#e0bd6c] font-medium flex items-center gap-1">
                   <i className="ri-file-copy-line" />Copy
                 </button>
                 <button onClick={clearSummary} className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 font-medium">
@@ -140,3 +140,4 @@ export default function PdfSummarizerPanel() {
     </div>
   )
 }
+

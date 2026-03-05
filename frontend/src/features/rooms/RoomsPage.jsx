@@ -130,7 +130,7 @@ export default function RoomsPage() {
           <input
             type="text"
             placeholder="Search rooms..."
-            className="w-full sm:w-64 h-10 pl-10 pr-4 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full sm:w-64 h-10 pl-10 pr-4 rounded-lg border border-gray-200 text-sm text-black placeholder-gray-500 focus:outline-none focus:border-[#F2CF7E] focus:ring-1 focus:ring-[#F2CF7E]"
           />
         </div>
         <div className="flex gap-2 sm:gap-3">
@@ -144,7 +144,7 @@ export default function RoomsPage() {
           </button>
           <button
             onClick={() => navigate('/create-room')}
-            className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+            className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-[#F2CF7E] text-black rounded-lg text-sm font-semibold hover:bg-[#e0bd6c] transition-colors"
           >
             <i className="ri-add-line mr-1" />
             <span className="hidden xs:inline">Create Room</span>
@@ -159,8 +159,8 @@ export default function RoomsPage() {
           onClick={() => setActiveTab('active')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'active'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-[#F2CF7E] text-black'
+              : 'border-transparent text-gray-600 hover:text-black'
           }`}
         >
           <i className="ri-live-line mr-1" />
@@ -170,8 +170,8 @@ export default function RoomsPage() {
           onClick={() => setActiveTab('recent')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'recent'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-[#F2CF7E] text-black'
+              : 'border-transparent text-gray-600 hover:text-black'
           }`}
         >
           <i className="ri-history-line mr-1" />
@@ -181,8 +181,8 @@ export default function RoomsPage() {
           onClick={() => setActiveTab('upcoming')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'upcoming'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-[#F2CF7E] text-black'
+              : 'border-transparent text-gray-600 hover:text-black'
           }`}
         >
           <i className="ri-calendar-line mr-1" />
@@ -242,7 +242,7 @@ export default function RoomsPage() {
             {activeTab === 'active' && (
               <button
                 onClick={() => navigate(`/room/${room.id}`)}
-                className="w-full py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                className="w-full py-2 bg-[#F2CF7E] text-black text-sm font-semibold rounded-lg hover:bg-[#e0bd6c] transition-colors"
               >
                 Join Room
               </button>
@@ -250,7 +250,7 @@ export default function RoomsPage() {
             {activeTab === 'recent' && (
               <button
                 onClick={() => navigate(`/room/${room.id}`)}
-                className="w-full py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors"
+                className="w-full py-2 bg-gray-100 text-black text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors"
               >
                 View Details
               </button>
@@ -258,7 +258,7 @@ export default function RoomsPage() {
             {activeTab === 'upcoming' && (
               <button
                 onClick={() => navigate(`/room/${room.id}`)}
-                className="w-full py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                className="w-full py-2 bg-[#F2CF7E] text-black text-sm font-semibold rounded-lg hover:bg-[#e0bd6c] transition-colors"
               >
                 View Session
               </button>
@@ -277,18 +277,18 @@ export default function RoomsPage() {
             value={joinUrl}
             onChange={e => setJoinUrl(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleJoinByUrl()}
-            className="w-full h-12 px-4 rounded-lg border border-gray-300 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 mb-4"
+            className="w-full h-12 px-4 rounded-lg border border-gray-300 text-sm text-black placeholder-gray-500 focus:outline-none focus:border-[#F2CF7E] focus:ring-1 focus:ring-[#F2CF7E] mb-4"
           />
           <div className="flex justify-end gap-3">
             <button
               onClick={() => setJoinModalOpen(false)}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 text-black rounded-lg text-sm font-medium hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
               onClick={handleJoinByUrl}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+              className="px-4 py-2 bg-[#F2CF7E] text-black rounded-lg text-sm font-semibold hover:bg-[#e0bd6c]"
             >
               Join Room
             </button>
