@@ -17,6 +17,7 @@ import WaitingScreen from './components/WaitingScreen'
 import { getSocket, connectSocket, disconnectSocket } from '../../lib/socket'
 import { useAuth } from '../../lib/auth'
 import { getRoomInfo } from '../../lib/roomApi'
+import { joinRoom } from '../../lib/roomApiV2'
 
 const featureTabs = [
   { id: 'chat', label: 'Chat', icon: 'ri-message-3-line' },
@@ -136,6 +137,8 @@ export default function StudyRoomPage() {
     if (socket && meetingIdFromUrl) {
       const waitForConnect = () => {
         socket.emit('join-meeting', { meetingId: meetingIdFromUrl, userName })
+        // Register in MongoDB so this room appears in user's history
+        joinRoom(meetingIdFromUrl).catch(() => {})
       }
       if (socket.connected) {
         waitForConnect()
@@ -144,26 +147,10 @@ export default function StudyRoomPage() {
       }
     }
 
-    // On mobile browsers, try to end the room via REST when the page is being closed.
-    // fetch with keepalive works during page unload and supports auth headers.
+    // On page close, disconnect socket. The server's disconnect handler cleans up
+    // in-memory room state. We do NOT call the REST end endpoint here because that
+    // removes the user from MongoDB participants, breaking room history.
     const handlePageHide = () => {
-      const token = localStorage.getItem('studyhub-token')
-      if (token && meetingIdFromUrl) {
-        const apiBase = import.meta.env.VITE_API_URL || ''
-        try {
-          fetch(`${apiBase}/api/rooms/${encodeURIComponent(meetingIdFromUrl)}/end`, {
-            method: 'POST',
-            keepalive: true,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({}),
-          }).catch(() => {})
-        } catch (e) {
-          // fetch not available during unload
-        }
-      }
       disconnectSocket()
     }
 
@@ -308,6 +295,11 @@ export default function StudyRoomPage() {
     const handleJoinApproved = (data) => {
       setIsWaiting(false)
       console.log('Join approved:', data.message)
+      // Register in MongoDB so this room appears in user's history
+      joinRoom(meetingIdFromUrl).catch(() => {})
+      // Re-emit join-meeting so VideoPanel (about to mount) gets existing participants
+      const s = getSocket()
+      if (s) s.emit('join-meeting', { meetingId: meetingIdFromUrl, userName })
     }
 
     const handleJoinDenied = (data) => {
