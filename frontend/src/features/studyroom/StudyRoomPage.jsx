@@ -17,7 +17,7 @@ import WaitingScreen from './components/WaitingScreen'
 import { getSocket, connectSocket, disconnectSocket } from '../../lib/socket'
 import { useAuth } from '../../lib/auth'
 import { getRoomInfo } from '../../lib/roomApi'
-import { joinRoom } from '../../lib/roomApiV2'
+import { joinRoom, endRoom } from '../../lib/roomApiV2'
 
 const featureTabs = [
   { id: 'chat', label: 'Chat', icon: 'ri-message-3-line' },
@@ -356,7 +356,6 @@ export default function StudyRoomPage() {
       
       // Try to end via MongoDB API first (if it's a persistent room)
       try {
-        const { endRoom } = await import('../../lib/roomApiV2')
         await endRoom(meetingIdFromUrl)
       } catch (err) {
         console.log('Room not in MongoDB, ending in-memory room only')
