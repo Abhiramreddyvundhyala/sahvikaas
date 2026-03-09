@@ -962,16 +962,17 @@ io.on('connection', (socket) => {
   })
 
   // ─── MEDIA STATE ────────────────────────────
-  socket.on('media-state', ({ meetingId, audio, video }) => {
+  socket.on('media-state', ({ meetingId, audio, video, isMobile }) => {
     const room = rooms.get(meetingId)
     if (room) {
       const p = room.participants.get(socket.id)
       if (p) {
         p.audioOn = audio
         p.videoOn = video
+        p.isMobile = !!isMobile
       }
     }
-    socket.to(meetingId).emit('media-state', { from: socket.id, audio, video })
+    socket.to(meetingId).emit('media-state', { from: socket.id, audio, video, isMobile: !!isMobile })
   })
 
   // ─── SCREEN SHARING ─────────────────────────

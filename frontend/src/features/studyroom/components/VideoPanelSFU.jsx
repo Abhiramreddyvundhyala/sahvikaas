@@ -8,6 +8,9 @@ export default function VideoPanelSFU({ meetingId, isMicOn, isVideoOn, isScreenS
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState('')
 
+  // Detect if this user is on a mobile device
+  const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+
   const localVideoRef = useRef(null)
   const localStreamRef = useRef(null)
   const socketRef = useRef(null)
@@ -197,6 +200,11 @@ export default function VideoPanelSFU({ meetingId, isMicOn, isVideoOn, isScreenS
           await consumeProducer(producer.id, producer.peerId, producer.peerName)
         }
 
+        // Send initial media state including isMobile flag
+        socketRef.current.emit('media-state', {
+          meetingId, audio: isMicOn, video: isVideoOn, isMobile: isMobileDevice,
+        })
+
         setConnected(true)
         setConnecting(false)
         console.log('✅ Successfully connected to SFU room')
@@ -340,14 +348,15 @@ export default function VideoPanelSFU({ meetingId, isMicOn, isVideoOn, isScreenS
       })
     })
 
-    socket.on('media-state', ({ from, audio, video }) => {
-      console.log(`🎤📹 Media state from ${from}: audio=${audio}, video=${video}`)
+    socket.on('media-state', ({ from, audio, video, isMobile }) => {
+      console.log(`🎤📹 Media state from ${from}: audio=${audio}, video=${video}, isMobile=${isMobile}`)
       setParticipants(prev => {
         const next = new Map(prev)
         const participant = next.get(from)
         if (participant) {
           participant.audioOn = audio
           participant.videoOn = video
+          participant.isMobile = !!isMobile
         }
         return next
       })
@@ -545,7 +554,7 @@ function RemoteVideo({ participant, peerId }) {
           autoPlay 
           playsInline 
           className={'absolute inset-0 w-full h-full' + (!showVideo ? ' hidden' : '')} 
-          style={{ objectFit: 'cover' }}
+          style={{ objectFit: 'cover', transform: participant.isMobile ? 'scaleX(-1)' : 'none' }}
         />
       )}
       {(!hasStream || !showVideo) && (

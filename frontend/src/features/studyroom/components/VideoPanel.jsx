@@ -34,6 +34,9 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
   const [error, setError] = useState('')
   const [isFullscreen, setIsFullscreen] = useState(false)
 
+  // Detect if this user is on a mobile device
+  const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+
   const localVideoRef = useRef(null)
   const localStreamRef = useRef(null)
   const screenStreamRef = useRef(null)
@@ -93,6 +96,10 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
         // Re-emit join-meeting so server re-sends existing-participants to our newly
         // registered listeners. The backend handles duplicate joins gracefully.
         socketRef.current.emit('join-meeting', { meetingId, userName: userNameRef.current })
+        // Send initial media state including isMobile flag
+        socketRef.current.emit('media-state', {
+          meetingId, audio: isMicOn, video: isVideoOn, isMobile: isMobileDevice,
+        })
         setConnected(true)
         setConnecting(false)
       } catch (err) {
@@ -109,6 +116,9 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
           socketRef.current = socket || getSocket()
           setupSocketListeners(socketRef.current)
           socketRef.current.emit('join-meeting', { meetingId, userName: userNameRef.current })
+          socketRef.current.emit('media-state', {
+            meetingId, audio: isMicOn, video: isVideoOn, isMobile: isMobileDevice,
+          })
           setConnected(true)
         }
       }
@@ -125,7 +135,7 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
     if (localStreamRef.current) {
       localStreamRef.current.getAudioTracks().forEach(t => { t.enabled = isMicOn })
       socketRef.current?.emit('media-state', {
-        meetingId: activeMeetingRef.current, audio: isMicOn, video: isVideoOn,
+        meetingId: activeMeetingRef.current, audio: isMicOn, video: isVideoOn, isMobile: isMobileDevice,
       })
     }
   }, [isMicOn])
@@ -135,7 +145,7 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
     if (localStreamRef.current) {
       localStreamRef.current.getVideoTracks().forEach(t => { t.enabled = isVideoOn })
       socketRef.current?.emit('media-state', {
-        meetingId: activeMeetingRef.current, audio: isMicOn, video: isVideoOn,
+        meetingId: activeMeetingRef.current, audio: isMicOn, video: isVideoOn, isMobile: isMobileDevice,
       })
     }
   }, [isVideoOn])
@@ -281,11 +291,11 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
       setParticipants(prev => { const next = new Map(prev); next.delete(id); return next })
     })
 
-    socket.on('media-state', ({ from, audio, video }) => {
+    socket.on('media-state', ({ from, audio, video, isMobile }) => {
       setParticipants(prev => {
         const next = new Map(prev)
         const existing = next.get(from)
-        if (existing) next.set(from, { ...existing, audioOn: audio, videoOn: video })
+        if (existing) next.set(from, { ...existing, audioOn: audio, videoOn: video, isMobile: !!isMobile })
         return next
       })
     })
@@ -549,7 +559,7 @@ function RemoteVideo({ participant }) {
   return (
     <div className="relative rounded-xl overflow-hidden bg-gray-800 w-full h-full" style={{ aspectRatio: '16/9', maxHeight: '100%', maxWidth: '100%' }}>
       {participant.stream && (
-        <video ref={videoRef} autoPlay playsInline className={'absolute inset-0 w-full h-full' + (participant.videoOn === false ? ' hidden' : '')} style={{ objectFit: 'cover' }} />
+        <video ref={videoRef} autoPlay playsInline className={'absolute inset-0 w-full h-full' + (participant.videoOn === false ? ' hidden' : '')} style={{ objectFit: 'cover', transform: participant.isMobile ? 'scaleX(-1)' : 'none' }} />
       )}
       {(!participant.stream || participant.videoOn === false) && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
