@@ -555,7 +555,7 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
 
           {/* Remote participants */}
           {[...participants.entries()].map(([socketId, participant]) => (
-            <RemoteVideo key={socketId} participant={participant} />
+            <RemoteVideo key={socketId} participant={participant} viewerIsMobile={isMobileDevice} />
           ))}
         </div>
       </div>
@@ -563,17 +563,21 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
   )
 }
 
-function RemoteVideo({ participant }) {
+function RemoteVideo({ participant, viewerIsMobile }) {
   const videoRef = useRef(null)
 
   useEffect(() => {
     if (videoRef.current && participant.stream) videoRef.current.srcObject = participant.stream
   }, [participant.stream])
 
+  // Apply scaleX(-1) if either the remote participant is on mobile (their camera mirrors)
+  // or the local viewer is on mobile (mobile browser rendering mirrors the video)
+  const needsFlip = participant.isMobile || viewerIsMobile
+
   return (
     <div className="relative rounded-xl overflow-hidden bg-gray-800 w-full h-full" style={{ aspectRatio: '16/9', maxHeight: '100%', maxWidth: '100%' }}>
       {participant.stream && (
-        <video ref={videoRef} autoPlay playsInline className={'absolute inset-0 w-full h-full' + (participant.videoOn === false ? ' hidden' : '')} style={{ objectFit: 'cover', transform: participant.isMobile ? 'scaleX(-1)' : 'none' }} />
+        <video ref={videoRef} autoPlay playsInline className={'absolute inset-0 w-full h-full' + (participant.videoOn === false ? ' hidden' : '')} style={{ objectFit: 'cover', transform: needsFlip ? 'scaleX(-1)' : 'none' }} />
       )}
       {(!participant.stream || participant.videoOn === false) && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-800">

@@ -514,7 +514,7 @@ export default function VideoPanelSFU({ meetingId, isMicOn, isVideoOn, isScreenS
 
           {/* Remote participants */}
           {[...participants.entries()].map(([peerId, participant]) => (
-            <RemoteVideo key={peerId} participant={participant} peerId={peerId} />
+            <RemoteVideo key={peerId} participant={participant} peerId={peerId} viewerIsMobile={isMobileDevice} />
           ))}
         </div>
       </div>
@@ -522,7 +522,7 @@ export default function VideoPanelSFU({ meetingId, isMicOn, isVideoOn, isScreenS
   )
 }
 
-function RemoteVideo({ participant, peerId }) {
+function RemoteVideo({ participant, peerId, viewerIsMobile }) {
   const videoRef = useRef(null)
   const [videoPlaying, setVideoPlaying] = useState(false)
 
@@ -548,6 +548,8 @@ function RemoteVideo({ participant, peerId }) {
 
   const hasStream = !!participant.stream
   const showVideo = hasStream && participant.videoOn !== false
+  // Apply scaleX(-1) if either the remote participant is on mobile or the local viewer is on mobile
+  const needsFlip = participant.isMobile || viewerIsMobile
 
   return (
     <div className="relative rounded-xl overflow-hidden bg-gray-800 w-full h-full" style={{ aspectRatio: '16/9', maxHeight: '100%', maxWidth: '100%' }}>
@@ -557,7 +559,7 @@ function RemoteVideo({ participant, peerId }) {
           autoPlay 
           playsInline 
           className={'absolute inset-0 w-full h-full' + (!showVideo ? ' hidden' : '')} 
-          style={{ objectFit: 'cover', transform: participant.isMobile ? 'scaleX(-1)' : 'none' }}
+          style={{ objectFit: 'cover', transform: needsFlip ? 'scaleX(-1)' : 'none' }}
         />
       )}
       {(!hasStream || !showVideo) && (
