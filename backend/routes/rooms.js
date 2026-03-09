@@ -115,12 +115,14 @@ router.post('/:id/end', authMiddleware, async (req, res) => {
   }
 })
 
-// Get all active rooms (public)
+// Get all active rooms (user-specific: only rooms user has joined/created)
 router.get('/', authMiddleware, async (req, res) => {
   try {
+    const userId = req.user._id
     const rooms = await Room.find({ 
       ended: false,
-      status: 'active'
+      status: 'active',
+      participants: userId
     }).populate('createdBy', 'name email')
     res.json({ rooms })
   } catch (err) {

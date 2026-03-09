@@ -1,7 +1,6 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import multer from 'multer'
 import fs from 'fs'
 import path from 'path'
@@ -135,6 +134,8 @@ function getParticipantsList(room) {
     joinedAt: p.joinedAt,
     audioOn: p.audioOn ?? true,
     videoOn: p.videoOn ?? true,
+    isHost: p.isHost ?? false,
+    isMobile: p.isMobile ?? false,
   }))
 }
 
@@ -227,16 +228,35 @@ const storage = multer.diskStorage({
 })
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }) // 10MB limit
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+// OpenRouter API configuration
+const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions'
+const OPENROUTER_MODEL = 'google/gemini-2.0-flash-001'
 
-// Helper: get Gemini model
-function getModel(systemInstruction = '', modelName = 'gemini-2.5-flash') {
-  const config = { model: modelName }
-  if (systemInstruction) {
-    config.systemInstruction = { parts: [{ text: systemInstruction }] }
+// Call OpenRouter API (OpenAI-compatible)
+async function callAI(messages, options = {}) {
+  const response = await fetch(OPENROUTER_API_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: options.model || OPENROUTER_MODEL,
+      messages,
+      max_tokens: options.maxTokens || 4096,
+      temperature: options.temperature ?? 0.7,
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    const err = new Error(error.error?.message || `API error: ${response.status}`)
+    err.status = response.status
+    throw err
   }
-  return genAI.getGenerativeModel(config)
+
+  const data = await response.json()
+  return data.choices[0].message.content
 }
 
 // Helper: retry with backoff for rate limits
@@ -245,9 +265,9 @@ async function withRetry(fn, maxRetries = 3) {
     try {
       return await fn()
     } catch (err) {
-      const isRateLimit = err.message?.includes('429') || err.message?.includes('quota')
+      const isRateLimit = err.status === 429 || err.message?.includes('429') || err.message?.includes('quota')
       if (isRateLimit && i < maxRetries - 1) {
-        const delay = Math.pow(2, i + 1) * 1000 // 2s, 4s, 8s
+        const delay = Math.pow(2, i + 1) * 1000
         console.log(`Rate limited, retrying in ${delay / 1000}s... (attempt ${i + 2}/${maxRetries})`)
         await new Promise(r => setTimeout(r, delay))
       } else {
@@ -295,31 +315,21 @@ You help students with:
 Be friendly, supportive, and encouraging. Use markdown formatting for better readability.
 When explaining code, use code blocks. When explaining math, use clear notation.`
 
-    const model = getModel(systemPrompt)
-    
-    // Build chat history for Gemini
-    const chatHistory = history.map(msg => ({
-      role: msg.role === 'ai' ? 'model' : 'user',
-      parts: [{ text: msg.content }],
-    }))
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...history.map(msg => ({
+        role: msg.role === 'ai' ? 'assistant' : 'user',
+        content: msg.content,
+      })),
+      { role: 'user', content: message },
+    ]
 
-    const chat = model.startChat({
-      history: chatHistory,
-      generationConfig: {
-        maxOutputTokens: 2048,
-        temperature: 0.7,
-      },
-    })
-
-    const response = await withRetry(async () => {
-      const result = await chat.sendMessage(message)
-      return result.response.text()
-    })
+    const response = await withRetry(() => callAI(messages, { maxTokens: 2048, temperature: 0.7 }))
 
     res.json({ response })
   } catch (error) {
     console.error('AI Chat Error:', error)
-    const status = error.message?.includes('429') ? 429 : 500
+    const status = error.status === 429 || error.message?.includes('429') ? 429 : 500
     const msg = status === 429 ? 'API quota exceeded. Please wait a minute and try again.' : 'Failed to get AI response'
     res.status(status).json({ error: msg, details: error.message })
   }
@@ -342,7 +352,6 @@ app.post('/api/ai/summarize-pdf', upload.single('pdf'), async (req, res) => {
     // Truncate if too long (Gemini has token limits)
     const truncatedText = text.slice(0, 30000)
 
-    const model = getModel()
     const prompt = `You are an academic document summarizer. Analyze the following PDF text and provide a comprehensive, well-structured summary.
 
 Format your response as follows:
@@ -356,10 +365,7 @@ Here is the document text:
 
 ${truncatedText}`
 
-    const summary = await withRetry(async () => {
-      const result = await model.generateContent(prompt)
-      return result.response.text()
-    })
+    const summary = await withRetry(() => callAI([{ role: 'user', content: prompt }]))
 
     // Clean up uploaded file
     fs.unlinkSync(req.file.path)
@@ -371,7 +377,7 @@ ${truncatedText}`
     if (req.file?.path && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path)
     }
-    const status = error.message?.includes('429') ? 429 : 500
+    const status = error.status === 429 || error.message?.includes('429') ? 429 : 500
     const msg = status === 429 ? 'API quota exceeded. Please wait a minute and try again.' : 'Failed to summarize PDF'
     res.status(status).json({ error: msg, details: error.message })
   }
@@ -393,7 +399,6 @@ app.post('/api/ai/generate-quiz', upload.single('pdf'), async (req, res) => {
     }
 
     const truncatedText = sourceText ? sourceText.slice(0, 25000) : ''
-    const model = getModel()
 
     const prompt = `Generate exactly ${numQuestions} multiple-choice quiz questions ${
       truncatedText 
@@ -421,14 +426,10 @@ Rules:
 - Make distractors plausible but clearly wrong
 - Return ONLY the JSON array, no other text`
 
-    const responseText = await withRetry(async () => {
-      const result = await model.generateContent(prompt)
-      let text = result.response.text()
-      text = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
-      return text
-    })
+    const responseText = await withRetry(() => callAI([{ role: 'user', content: prompt }]))
     
-    const questions = JSON.parse(responseText)
+    const cleanedText = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+    const questions = JSON.parse(cleanedText)
 
     res.json({ questions })
   } catch (error) {
@@ -436,7 +437,7 @@ Rules:
     if (req.file?.path && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path)
     }
-    const status = error.message?.includes('429') ? 429 : 500
+    const status = error.status === 429 || error.message?.includes('429') ? 429 : 500
     const msg = status === 429 ? 'API quota exceeded. Please wait a minute and try again.' : 'Failed to generate quiz'
     res.status(status).json({ error: msg, details: error.message })
   }
@@ -448,7 +449,6 @@ app.post('/api/ai/voice', async (req, res) => {
     const { message, context = '' } = req.body
     if (!message) return res.status(400).json({ error: 'Message is required' })
 
-    const model = getModel()
     const prompt = `You are a voice-based AI study assistant. The student said: "${message}"
 ${context ? `Context from their study session: ${context}` : ''}
 
@@ -456,15 +456,12 @@ Provide a clear, concise, and helpful response suitable for text-to-speech playb
 Keep your response conversational and under 150 words so it's easy to listen to.
 If explaining concepts, break them down simply.`
 
-    const response = await withRetry(async () => {
-      const result = await model.generateContent(prompt)
-      return result.response.text()
-    })
+    const response = await withRetry(() => callAI([{ role: 'user', content: prompt }]))
 
     res.json({ response })
   } catch (error) {
     console.error('Voice Assistant Error:', error)
-    const status = error.message?.includes('429') ? 429 : 500
+    const status = error.status === 429 || error.message?.includes('429') ? 429 : 500
     const msg = status === 429 ? 'API quota exceeded. Please wait a minute and try again.' : 'Failed to process voice request'
     res.status(status).json({ error: msg, details: error.message })
   }
@@ -476,7 +473,6 @@ app.post('/api/ai/enhance-notes', async (req, res) => {
     const { content, action } = req.body
     if (!content) return res.status(400).json({ error: 'Content is required' })
 
-    const model = getModel()
     let prompt = ''
 
     switch (action) {
@@ -496,15 +492,12 @@ app.post('/api/ai/enhance-notes', async (req, res) => {
         prompt = `Improve and enhance the following study notes:\n\n${content}`
     }
 
-    const enhanced = await withRetry(async () => {
-      const result = await model.generateContent(prompt)
-      return result.response.text()
-    })
+    const enhanced = await withRetry(() => callAI([{ role: 'user', content: prompt }]))
 
     res.json({ enhanced })
   } catch (error) {
     console.error('Notes Enhance Error:', error)
-    const status = error.message?.includes('429') ? 429 : 500
+    const status = error.status === 429 || error.message?.includes('429') ? 429 : 500
     const msg = status === 429 ? 'API quota exceeded. Please wait a minute and try again.' : 'Failed to enhance notes'
     res.status(status).json({ error: msg, details: error.message })
   }
@@ -516,7 +509,6 @@ app.post('/api/ai/smart-reply', async (req, res) => {
     const { message, chatHistory = [] } = req.body
     if (!message) return res.status(400).json({ error: 'Message is required' })
 
-    const model = getModel()
     const recentChat = chatHistory.slice(-10).map(m => `${m.user}: ${m.content}`).join('\n')
 
     const prompt = `You are an AI assistant in a study room group chat. A student mentioned you with @AI.
@@ -527,15 +519,12 @@ Student's message: ${message}
 
 Reply helpfully and concisely (under 200 words). Be friendly and academic.`
 
-    const response = await withRetry(async () => {
-      const result = await model.generateContent(prompt)
-      return result.response.text()
-    })
+    const response = await withRetry(() => callAI([{ role: 'user', content: prompt }]))
 
     res.json({ response })
   } catch (error) {
     console.error('Smart Reply Error:', error)
-    const status = error.message?.includes('429') ? 429 : 500
+    const status = error.status === 429 || error.message?.includes('429') ? 429 : 500
     const msg = status === 429 ? 'API quota exceeded. Please wait a minute and try again.' : 'Failed to generate smart reply'
     res.status(status).json({ error: msg, details: error.message })
   }
@@ -979,6 +968,95 @@ io.on('connection', (socket) => {
       }
     }
     socket.to(meetingId).emit('media-state', { from: socket.id, audio, video, isMobile: !!isMobile })
+  })
+
+  // ─── HOST: MUTE PARTICIPANT ─────────────────
+  socket.on('host-mute-participant', ({ meetingId, targetSocketId, mute }) => {
+    const room = rooms.get(meetingId)
+    if (!room) return
+    const requester = room.participants.get(socket.id)
+    if (!requester || !requester.isHost) return
+
+    const target = room.participants.get(targetSocketId)
+    if (target) {
+      target.audioOn = !mute
+      const targetSocket = io.sockets.sockets.get(targetSocketId)
+      if (targetSocket) {
+        targetSocket.emit('host-muted-you', { mute })
+      }
+      io.to(meetingId).emit('participants-updated', getParticipantsList(room))
+    }
+  })
+
+  // ─── HOST: MUTE ALL ────────────────────────
+  socket.on('host-mute-all', ({ meetingId, mute }) => {
+    const room = rooms.get(meetingId)
+    if (!room) return
+    const requester = room.participants.get(socket.id)
+    if (!requester || !requester.isHost) return
+
+    for (const [sid, p] of room.participants) {
+      if (sid !== socket.id) {
+        p.audioOn = !mute
+        const s = io.sockets.sockets.get(sid)
+        if (s) s.emit('host-muted-you', { mute })
+      }
+    }
+    io.to(meetingId).emit('participants-updated', getParticipantsList(room))
+  })
+
+  // ─── HOST: DISABLE VIDEO OF PARTICIPANT ─────
+  socket.on('host-disable-video', ({ meetingId, targetSocketId, disable }) => {
+    const room = rooms.get(meetingId)
+    if (!room) return
+    const requester = room.participants.get(socket.id)
+    if (!requester || !requester.isHost) return
+
+    const target = room.participants.get(targetSocketId)
+    if (target) {
+      target.videoOn = !disable
+      const targetSocket = io.sockets.sockets.get(targetSocketId)
+      if (targetSocket) {
+        targetSocket.emit('host-disabled-video', { disable })
+      }
+      io.to(meetingId).emit('participants-updated', getParticipantsList(room))
+    }
+  })
+
+  // ─── HOST: REMOVE PARTICIPANT ───────────────
+  socket.on('host-remove-participant', ({ meetingId, targetSocketId }) => {
+    const room = rooms.get(meetingId)
+    if (!room) return
+    const requester = room.participants.get(socket.id)
+    if (!requester || !requester.isHost) return
+
+    const target = room.participants.get(targetSocketId)
+    if (!target) return
+
+    // Remove from room
+    room.participants.delete(targetSocketId)
+
+    // Notify the removed user
+    const targetSocket = io.sockets.sockets.get(targetSocketId)
+    if (targetSocket) {
+      targetSocket.emit('host-removed-you', { message: 'You have been removed from the room by the host.' })
+      targetSocket.leave(meetingId)
+    }
+
+    // Notify others
+    io.to(meetingId).emit('user-left', { id: targetSocketId })
+    io.to(meetingId).emit('participants-updated', getParticipantsList(room))
+
+    // System message
+    const removeMsg = {
+      id: uuidv4(),
+      type: 'system',
+      content: `${target.name} was removed from the room by the host`,
+      timestamp: Date.now(),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    }
+    room.chatMessages.push(removeMsg)
+    io.to(meetingId).emit('chat-message', removeMsg)
   })
 
   // ─── SCREEN SHARING ─────────────────────────

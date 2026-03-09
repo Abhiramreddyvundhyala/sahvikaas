@@ -8,6 +8,7 @@ import PdfSummarizerPanel from './components/PdfSummarizerPanel'
 import QuizGeneratorPanel from './components/QuizGeneratorPanel'
 import ResourcesPanel from './components/ResourcesPanel'
 import TasksPanel from './components/TasksPanel'
+import ParticipantsPanel from './components/ParticipantsPanel'
 import SettingsModal from './components/SettingsModal'
 import PointsModal from './components/PointsModal'
 import VoiceAssistant from './components/VoiceAssistant'
@@ -21,6 +22,7 @@ import { joinRoom, endRoom } from '../../lib/roomApiV2'
 
 const featureTabs = [
   { id: 'chat', label: 'Chat', icon: 'ri-message-3-line' },
+  { id: 'participants', label: 'People', icon: 'ri-group-line' },
   { id: 'notes', label: 'Notes', icon: 'ri-file-text-line' },
   { id: 'pdf', label: 'PDF Summarizer', icon: 'ri-file-pdf-2-line' },
   { id: 'quiz', label: 'Quiz Generator', icon: 'ri-questionnaire-line' },
@@ -337,12 +339,37 @@ export default function StudyRoomPage() {
       if (count === 0) setWaitingRoomOpen(false)
     }
 
+    const handleHostMutedYou = (data) => {
+      if (data.mute) {
+        setIsMicOn(false)
+      } else {
+        setIsMicOn(true)
+      }
+    }
+
+    const handleHostDisabledVideo = (data) => {
+      if (data.disable) {
+        setIsVideoOn(false)
+      } else {
+        setIsVideoOn(true)
+      }
+    }
+
+    const handleHostRemovedYou = (data) => {
+      alert(data.message || 'You have been removed from the room by the host.')
+      disconnectSocket()
+      navigate('/rooms')
+    }
+
     socket.on('room-ended', handleRoomEnded)
     socket.on('waiting-for-approval', handleWaitingForApproval)
     socket.on('join-approved', handleJoinApproved)
     socket.on('join-denied', handleJoinDenied)
     socket.on('participant-waiting', handleParticipantWaiting)
     socket.on('waiting-list-updated', handleWaitingListUpdated)
+    socket.on('host-muted-you', handleHostMutedYou)
+    socket.on('host-disabled-video', handleHostDisabledVideo)
+    socket.on('host-removed-you', handleHostRemovedYou)
 
     return () => {
       socket.off('room-ended', handleRoomEnded)
@@ -351,6 +378,9 @@ export default function StudyRoomPage() {
       socket.off('join-denied', handleJoinDenied)
       socket.off('participant-waiting', handleParticipantWaiting)
       socket.off('waiting-list-updated', handleWaitingListUpdated)
+      socket.off('host-muted-you', handleHostMutedYou)
+      socket.off('host-disabled-video', handleHostDisabledVideo)
+      socket.off('host-removed-you', handleHostRemovedYou)
     }
   }, [navigate, isHost])
 
@@ -393,6 +423,7 @@ export default function StudyRoomPage() {
   const renderFeatureContent = () => {
     switch (activeFeature) {
       case 'chat': return <ChatPanel roomId={meetingIdFromUrl} userName={userName} />
+      case 'participants': return <ParticipantsPanel roomId={meetingIdFromUrl} isHost={isHost} />
       case 'notes': return <NotesPanel roomId={meetingIdFromUrl} />
       case 'pdf': return <PdfSummarizerPanel />
       case 'quiz': return <QuizGeneratorPanel />

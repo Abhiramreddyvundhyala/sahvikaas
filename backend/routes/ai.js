@@ -1,5 +1,4 @@
 import express from 'express'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import multer from 'multer'
 import pdfParse from 'pdf-parse'
 import { authMiddleware } from '../middleware/auth.js'
@@ -7,9 +6,36 @@ import { authMiddleware } from '../middleware/auth.js'
 const router = express.Router()
 const upload = multer({ storage: multer.memoryStorage() })
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-const GEMINI_MODEL = 'gemini-2.0-flash'
+// OpenRouter API configuration
+const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions'
+const OPENROUTER_MODEL = 'google/gemini-2.0-flash-001'
+
+// Call OpenRouter API (OpenAI-compatible)
+async function callAI(messages, options = {}) {
+  const response = await fetch(OPENROUTER_API_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: options.model || OPENROUTER_MODEL,
+      messages,
+      max_tokens: options.maxTokens || 4096,
+      temperature: options.temperature ?? 0.7,
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    const err = new Error(error.error?.message || `API error: ${response.status}`)
+    err.status = response.status
+    throw err
+  }
+
+  const data = await response.json()
+  return data.choices[0].message.content
+}
 
 // Retry helper for 429 rate limit errors
 async function withRetry(fn, maxRetries = 3) {
@@ -19,7 +45,6 @@ async function withRetry(fn, maxRetries = 3) {
     } catch (err) {
       const is429 = err.status === 429 || err.message?.includes('429')
       if (!is429 || attempt === maxRetries) throw err
-      // Extract retry delay from error or use exponential backoff
       const match = err.message?.match(/retry in ([\d.]+)s/)
       const delay = match ? Math.ceil(parseFloat(match[1]) * 1000) : (2 ** attempt) * 2000
       await new Promise(r => setTimeout(r, Math.min(delay, 60000)))
@@ -48,37 +73,17 @@ router.post('/assistant', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Message is required' })
     }
     
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL })
-    
-    // Filter and format history - must start with 'user' role
-    const formattedHistory = history
-      .filter(h => h.content && h.content.trim() && h.role !== 'ai') // Remove empty and initial AI messages
+    // Build messages array from history
+    const messages = history
+      .filter(h => h.content && h.content.trim())
       .map(h => ({
-        role: h.role === 'user' ? 'user' : 'model',
-        parts: [{ text: h.content }]
+        role: h.role === 'user' ? 'user' : 'assistant',
+        content: h.content
       }))
     
-    // If no history or history is empty, use simple generation
-    if (formattedHistory.length === 0) {
-      const result = await withRetry(() => model.generateContent(message))
-      const response = result.response.text()
-      return res.json({ success: true, response })
-    }
+    messages.push({ role: 'user', content: message })
     
-    // Ensure first message is from user
-    if (formattedHistory[0].role === 'model') {
-      formattedHistory.shift()
-    }
-    
-    // Use chat with history
-    const chat = model.startChat({
-      history: formattedHistory,
-      generationConfig: { maxOutputTokens: 1000 }
-    })
-    
-    const result = await withRetry(() => chat.sendMessage(message))
-    const response = result.response.text()
-    
+    const response = await withRetry(() => callAI(messages, { maxTokens: 1000 }))
     res.json({ success: true, response })
   } catch (error) {
     handleAIError(error, res, 'get AI response')
@@ -96,7 +101,6 @@ router.post('/quiz', authMiddleware, upload.single('pdf'), async (req, res) => {
       content = pdfData.text.substring(0, 5000)
     }
     
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL })
     const prompt = `Generate ${numQuestions} ${difficulty} difficulty multiple-choice questions about: ${content}
 
 Format as JSON array:
@@ -107,8 +111,7 @@ Format as JSON array:
   "explanation": "Why this is correct"
 }]`
     
-    const result = await withRetry(() => model.generateContent(prompt))
-    const text = result.response.text()
+    const text = await withRetry(() => callAI([{ role: 'user', content: prompt }]))
     const jsonMatch = text.match(/\[[\s\S]*\]/)
     const questions = jsonMatch ? JSON.parse(jsonMatch[0]) : []
     
@@ -122,8 +125,6 @@ Format as JSON array:
 router.post('/study-plan', authMiddleware, async (req, res) => {
   try {
     const { exams, hoursPerDay, subjects } = req.body
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL })
-    
     const prompt = `Create a detailed weekly study plan:
 - Exams: ${JSON.stringify(exams)}
 - Available hours per day: ${hoursPerDay}
@@ -137,8 +138,7 @@ Format as JSON:
   "tips": ["tip1", "tip2"]
 }`
     
-    const result = await withRetry(() => model.generateContent(prompt))
-    const text = result.response.text()
+    const text = await withRetry(() => callAI([{ role: 'user', content: prompt }]))
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     const plan = jsonMatch ? JSON.parse(jsonMatch[0]) : { plan: [], tips: [] }
     
@@ -159,7 +159,6 @@ router.post('/summarize', authMiddleware, upload.single('pdf'), async (req, res)
       content = pdfData.text
     }
     
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL })
     const prompt = `Summarize these notes concisely with key points and important terms highlighted:
 
 ${content.substring(0, 10000)}
@@ -175,8 +174,7 @@ Format:
 ## Important Terms
 - Term: Definition`
     
-    const result = await withRetry(() => model.generateContent(prompt))
-    const summary = result.response.text()
+    const summary = await withRetry(() => callAI([{ role: 'user', content: prompt }]))
     
     res.json({ success: true, summary })
   } catch (error) {
@@ -188,8 +186,6 @@ Format:
 router.post('/flashcards', authMiddleware, async (req, res) => {
   try {
     const { topic, content, count = 10 } = req.body
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL })
-    
     const prompt = `Generate ${count} flashcards for: ${topic}
 ${content ? `Content: ${content.substring(0, 3000)}` : ''}
 
@@ -200,8 +196,7 @@ Format as JSON array:
   "category": "subtopic"
 }]`
     
-    const result = await withRetry(() => model.generateContent(prompt))
-    const text = result.response.text()
+    const text = await withRetry(() => callAI([{ role: 'user', content: prompt }]))
     const jsonMatch = text.match(/\[[\s\S]*\]/)
     const flashcards = jsonMatch ? JSON.parse(jsonMatch[0]) : []
     
@@ -215,7 +210,6 @@ Format as JSON array:
 router.post('/doubt-solver', authMiddleware, async (req, res) => {
   try {
     const { question, subject } = req.body
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL })
     
     const prompt = `Solve this ${subject} question with step-by-step explanation:
 
@@ -227,8 +221,7 @@ Provide:
 3. Key concepts used
 4. Common mistakes to avoid`
     
-    const result = await withRetry(() => model.generateContent(prompt))
-    const solution = result.response.text()
+    const solution = await withRetry(() => callAI([{ role: 'user', content: prompt }]))
     
     res.json({ success: true, solution })
   } catch (error) {
@@ -240,7 +233,6 @@ Provide:
 router.post('/exam-predictor', authMiddleware, async (req, res) => {
   try {
     const { subject, topics, examType } = req.body
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL })
     
     const prompt = `Predict important questions for ${examType} exam in ${subject}:
 Topics: ${topics.join(', ')}
@@ -256,8 +248,7 @@ Format as JSON:
   "priorities": ["topic1", "topic2"]
 }`
     
-    const result = await withRetry(() => model.generateContent(prompt))
-    const text = result.response.text()
+    const text = await withRetry(() => callAI([{ role: 'user', content: prompt }]))
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     const predictions = jsonMatch ? JSON.parse(jsonMatch[0]) : { predictions: [], priorities: [] }
     
@@ -271,7 +262,6 @@ Format as JSON:
 router.post('/assignment', authMiddleware, async (req, res) => {
   try {
     const { topic, requirements, wordCount, stage } = req.body
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL })
     
     let prompt = ''
     if (stage === 'outline') {
@@ -293,8 +283,7 @@ ${requirements}
 Suggest improvements for: clarity, structure, grammar, academic tone`
     }
     
-    const result = await withRetry(() => model.generateContent(prompt))
-    const content = result.response.text()
+    const content = await withRetry(() => callAI([{ role: 'user', content: prompt }]))
     
     res.json({ success: true, content })
   } catch (error) {
@@ -306,7 +295,6 @@ Suggest improvements for: clarity, structure, grammar, academic tone`
 router.post('/eli5', authMiddleware, async (req, res) => {
   try {
     const { topic, complexity = 5 } = req.body
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL })
     
     const levels = {
       1: 'a 5-year-old child with simple words and analogies',
@@ -324,8 +312,7 @@ Use:
 - Relatable comparisons
 - Visual descriptions`
     
-    const result = await withRetry(() => model.generateContent(prompt))
-    const explanation = result.response.text()
+    const explanation = await withRetry(() => callAI([{ role: 'user', content: prompt }]))
     
     res.json({ success: true, explanation })
   } catch (error) {
@@ -337,7 +324,6 @@ Use:
 router.post('/formula-sheet', authMiddleware, async (req, res) => {
   try {
     const { subject, topics } = req.body
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL })
     
     const prompt = `Generate a comprehensive formula sheet for ${subject}:
 Topics: ${topics.join(', ')}
@@ -351,8 +337,7 @@ Include:
 
 Format in organized sections with clear headings`
     
-    const result = await withRetry(() => model.generateContent(prompt))
-    const formulaSheet = result.response.text()
+    const formulaSheet = await withRetry(() => callAI([{ role: 'user', content: prompt }]))
     
     res.json({ success: true, formulaSheet })
   } catch (error) {
@@ -364,7 +349,6 @@ Format in organized sections with clear headings`
 router.post('/voice-to-text', authMiddleware, async (req, res) => {
   try {
     const { transcript, subject } = req.body
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL })
     
     const prompt = `Convert this lecture transcript into organized notes for ${subject}:
 
@@ -382,8 +366,7 @@ Include:
 - Examples mentioned
 - Action items or homework`
     
-    const result = await withRetry(() => model.generateContent(prompt))
-    const notes = result.response.text()
+    const notes = await withRetry(() => callAI([{ role: 'user', content: prompt }]))
     
     res.json({ success: true, notes })
   } catch (error) {
@@ -395,7 +378,6 @@ Include:
 router.post('/lab-report', authMiddleware, async (req, res) => {
   try {
     const { experimentType, observations, data } = req.body
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL })
     
     const prompt = `Generate a lab report for: ${experimentType}
 
@@ -414,8 +396,7 @@ Include standard sections:
 
 Use proper scientific format and terminology`
     
-    const result = await withRetry(() => model.generateContent(prompt))
-    const report = result.response.text()
+    const report = await withRetry(() => callAI([{ role: 'user', content: prompt }]))
     
     res.json({ success: true, report })
   } catch (error) {
