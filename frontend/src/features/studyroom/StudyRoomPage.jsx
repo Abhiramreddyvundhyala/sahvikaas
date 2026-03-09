@@ -65,7 +65,13 @@ export default function StudyRoomPage() {
   const isMobile = useIsMobile()
   const isTablet = useIsTablet()
   // Detect actual mobile device (not just screen size) for camera orientation
-  const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  const isMobileDevice = (() => {
+    const ua = navigator.userAgent
+    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return true
+    if (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1) return true
+    if (navigator.userAgentData?.mobile === true) return true
+    return false
+  })()
 
   // Room info state
   const [roomInfo, setRoomInfo] = useState({ name: '', subject: '' })

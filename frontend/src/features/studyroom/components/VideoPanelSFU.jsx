@@ -8,8 +8,18 @@ export default function VideoPanelSFU({ meetingId, isMicOn, isVideoOn, isScreenS
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState('')
 
-  // Detect if this user is on a mobile device
-  const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  // Detect if this user is on a mobile device (robust detection)
+  const isMobileDevice = (() => {
+    const ua = navigator.userAgent
+    // Standard mobile user agent check
+    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return true
+    // iPadOS 13+ reports as Macintosh but has touch
+    if (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1) return true
+    // Chrome User-Agent Client Hints API (Chromium 90+)
+    if (navigator.userAgentData?.mobile === true) return true
+    return false
+  })()
+  console.log('📱 [VideoPanelSFU] Device detection:', { isMobileDevice, ua: navigator.userAgent.substring(0, 80), maxTouchPoints: navigator.maxTouchPoints })
 
   const localVideoRef = useRef(null)
   const localStreamRef = useRef(null)
@@ -352,15 +362,14 @@ export default function VideoPanelSFU({ meetingId, isMicOn, isVideoOn, isScreenS
       console.log(`🎤📹 Media state from ${from}: audio=${audio}, video=${video}, isMobile=${isMobile}`)
       setParticipants(prev => {
         const next = new Map(prev)
-        const participant = next.get(from)
-        if (participant) {
-          participant.audioOn = audio
-          participant.videoOn = video
-          participant.isMobile = !!isMobile
+        const existing = next.get(from)
+        if (existing) {
+          next.set(from, { ...existing, audioOn: audio, videoOn: video, isMobile: !!isMobile })
         } else {
           // Create participant if it doesn't exist yet (race condition)
           next.set(from, { name: 'Peer', streams: {}, stream: null, audioOn: audio, videoOn: video, isMobile: !!isMobile })
         }
+        console.log('📡 [SFU media-state] from:', from, 'isMobile:', !!isMobile)
         return next
       })
     })
@@ -550,6 +559,7 @@ function RemoteVideo({ participant, peerId, viewerIsMobile }) {
   const showVideo = hasStream && participant.videoOn !== false
   // XOR: flip when exactly one side is mobile
   const needsFlip = !!participant.isMobile !== !!viewerIsMobile
+  console.log('🎥 [SFU RemoteVideo]', participant.name, '| sender.isMobile:', !!participant.isMobile, '| viewer.isMobile:', !!viewerIsMobile, '| needsFlip:', needsFlip)
 
   return (
     <div className="relative rounded-xl overflow-hidden bg-gray-800 w-full h-full" style={{ aspectRatio: '16/9', maxHeight: '100%', maxWidth: '100%' }}>

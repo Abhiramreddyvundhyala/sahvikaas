@@ -34,8 +34,18 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
   const [error, setError] = useState('')
   const [isFullscreen, setIsFullscreen] = useState(false)
 
-  // Detect if this user is on a mobile device
-  const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  // Detect if this user is on a mobile device (robust detection)
+  const isMobileDevice = (() => {
+    const ua = navigator.userAgent
+    // Standard mobile user agent check
+    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return true
+    // iPadOS 13+ reports as Macintosh but has touch
+    if (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1) return true
+    // Chrome User-Agent Client Hints API (Chromium 90+)
+    if (navigator.userAgentData?.mobile === true) return true
+    return false
+  })()
+  console.log('📱 [VideoPanel] Device detection:', { isMobileDevice, ua: navigator.userAgent.substring(0, 80), maxTouchPoints: navigator.maxTouchPoints })
 
   const localVideoRef = useRef(null)
   const localStreamRef = useRef(null)
@@ -233,16 +243,18 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
 
     socket.on('existing-participants', async (existingUsers) => {
       for (const user of existingUsers) {
-        // Skip if we already have a peer connection (avoid duplicate offers)
-        if (peersRef.current.has(user.socketId)) continue
-        // Store participant info including isMobile
+        // Always update participant info (including isMobile) even if already known
         setParticipants(prev => {
           const next = new Map(prev)
-          if (!next.has(user.socketId)) {
-            next.set(user.socketId, { name: user.name, stream: null, audioOn: user.audioOn !== false, videoOn: user.videoOn !== false, isMobile: !!user.isMobile })
-          }
+          const existing = next.get(user.socketId) || {}
+          next.set(user.socketId, { ...existing, name: user.name, audioOn: user.audioOn !== false, videoOn: user.videoOn !== false, isMobile: !!user.isMobile })
+          // Preserve stream if already set by ontrack
+          if (!existing.stream) next.get(user.socketId).stream = null
           return next
         })
+        console.log('👥 [existing-participants] user:', user.name, 'isMobile:', !!user.isMobile)
+        // Skip peer connection creation if we already have one
+        if (peersRef.current.has(user.socketId)) continue
         const pc = createPeerConnection(user.socketId, user.name)
         const offer = await pc.createOffer()
         await pc.setLocalDescription(offer)
@@ -253,9 +265,12 @@ export default function VideoPanel({ meetingId, isMicOn, isVideoOn, isScreenShar
     socket.on('user-joined', (user) => {
       // Skip if it's ourselves (we handle our own video locally)
       if (user.socketId === socket.id) return
+      console.log('👤 [user-joined]', user.name, 'isMobile:', !!user.isMobile)
       setParticipants(prev => {
         const next = new Map(prev)
-        next.set(user.socketId, { name: user.name, stream: null, audioOn: true, videoOn: true, isMobile: !!user.isMobile })
+        const existing = next.get(user.socketId) || {}
+        // Merge with existing data to preserve stream from ontrack
+        next.set(user.socketId, { ...existing, name: user.name, audioOn: true, videoOn: true, isMobile: !!user.isMobile })
         return next
       })
     })
@@ -570,11 +585,11 @@ function RemoteVideo({ participant, viewerIsMobile }) {
     if (videoRef.current && participant.stream) videoRef.current.srcObject = participant.stream
   }, [participant.stream])
 
-  // XOR: flip when exactly one side is mobile (the two mirrors don't cancel out).
-  // Mobile camera sends mirrored feed, mobile browser displays mirrored —
-  // if both are mobile they cancel, if both are desktop no flip needed,
-  // if only one is mobile we need to counteract it.
+  // XOR: flip when exactly one side is mobile.
+  // If both are same device type (both mobile or both desktop), no flip.
+  // If one is mobile and the other desktop, flip to correct the orientation.
   const needsFlip = !!participant.isMobile !== !!viewerIsMobile
+  console.log('🎥 [RemoteVideo]', participant.name, '| sender.isMobile:', !!participant.isMobile, '| viewer.isMobile:', !!viewerIsMobile, '| needsFlip:', needsFlip)
 
   return (
     <div className="relative rounded-xl overflow-hidden bg-gray-800 w-full h-full" style={{ aspectRatio: '16/9', maxHeight: '100%', maxWidth: '100%' }}>
