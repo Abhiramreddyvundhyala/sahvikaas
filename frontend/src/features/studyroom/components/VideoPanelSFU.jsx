@@ -32,7 +32,12 @@ export default function VideoPanelSFU({ meetingId, isMicOn, isVideoOn, isScreenS
         // Get local media
         console.log('📹 Requesting camera and microphone...')
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            aspectRatio: { ideal: 16 / 9 },
+            facingMode: 'user',
+          },
           audio: { echoCancellation: true, noiseSuppression: true },
         })
 
@@ -395,7 +400,10 @@ export default function VideoPanelSFU({ meetingId, isMicOn, isVideoOn, isScreenS
 
   // ========== Grid ==========
   const totalParticipants = participants.size + 1
-  const gridCols = totalParticipants <= 1 ? 1 : totalParticipants <= 4 ? 2 : totalParticipants <= 9 ? 3 : 4
+  const isMobileView = typeof window !== 'undefined' && window.innerWidth < 768
+  const gridCols = isMobileView
+    ? (totalParticipants <= 1 ? 1 : 2)
+    : (totalParticipants <= 1 ? 1 : totalParticipants <= 4 ? 2 : totalParticipants <= 9 ? 3 : 4)
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-gray-900">
@@ -424,17 +432,22 @@ export default function VideoPanelSFU({ meetingId, isMicOn, isVideoOn, isScreenS
       )}
 
       {/* Video Grid */}
-      <div className="flex-1 p-2 overflow-hidden">
+      <div className="flex-1 p-2 overflow-hidden flex items-center justify-center">
         <div
           className="w-full h-full gap-2"
-          style={{ display: 'grid', gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gridAutoRows: '1fr' }}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
+            gridAutoRows: '1fr',
+            alignContent: 'center',
+          }}
         >
           {/* Local video */}
-          <div className="relative rounded-lg overflow-hidden bg-gray-800 min-h-0">
-            <video ref={localVideoRef} autoPlay playsInline muted className={'w-full h-full object-cover' + (!isVideoOn ? ' hidden' : '')} />
+          <div className="relative rounded-xl overflow-hidden bg-gray-800" style={{ aspectRatio: '16/9' }}>
+            <video ref={localVideoRef} autoPlay playsInline muted className={'absolute inset-0 w-full h-full object-cover' + (!isVideoOn ? ' hidden' : '')} style={{ transform: 'scaleX(-1)' }} />
             {!isVideoOn && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-                <div className="w-12 h-12 rounded-full bg-[#F2CF7E] flex items-center justify-center text-white text-lg font-bold">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-[#F2CF7E] flex items-center justify-center text-white text-lg sm:text-xl font-bold">
                   {userNameRef.current.charAt(0).toUpperCase()}
                 </div>
               </div>
@@ -485,18 +498,18 @@ function RemoteVideo({ participant, peerId }) {
   const showVideo = hasStream && participant.videoOn !== false
 
   return (
-    <div className="relative rounded-lg overflow-hidden bg-gray-800 min-h-0">
+    <div className="relative rounded-xl overflow-hidden bg-gray-800" style={{ aspectRatio: '16/9' }}>
       {hasStream && (
         <video 
           ref={videoRef} 
           autoPlay 
           playsInline 
-          className={'w-full h-full object-cover' + (!showVideo ? ' hidden' : '')} 
+          className={'absolute inset-0 w-full h-full object-cover' + (!showVideo ? ' hidden' : '')} 
         />
       )}
       {(!hasStream || !showVideo) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-800">
-          <div className="w-12 h-12 rounded-full bg-emerald-600 flex items-center justify-center text-white text-lg font-bold mb-2">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-emerald-600 flex items-center justify-center text-white text-lg sm:text-xl font-bold mb-2">
             {(participant.name || 'P').charAt(0).toUpperCase()}
           </div>
           {!hasStream && (

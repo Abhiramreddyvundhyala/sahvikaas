@@ -28,6 +28,9 @@ dist-ssr
 .env.*
 !.env.example
 !.env.*.example
+.env.example
+.env.production
+.env.production.example
 
 # Backend env files
 backend/.env
