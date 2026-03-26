@@ -27,13 +27,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        working-directory: ./frontend
+        working-directory: ./landing-page
 
       - name: Build
-        env:
-          VITE_API_URL: https://sahvikaas.onrender.com
         run: npm run build
-        working-directory: ./frontend
+        working-directory: ./landing-page
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -41,7 +39,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './frontend/dist'
+          path: './landing-page/dist'
+          subdirectory: 'landing-page'
 
   deploy:
     environment:
