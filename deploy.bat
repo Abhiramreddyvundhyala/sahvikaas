@@ -72,7 +72,7 @@ echo   Deployment Successful!
 echo ========================================
 echo.
 echo Your app will be available at:
-echo   https://varma22.github.io/sahvikaas/
+echo   https://abhiramreddyvundhyala.github.io/sahvikaas/landing-page/
 echo.
 echo Note: It may take a few minutes for changes to appear
 echo.
