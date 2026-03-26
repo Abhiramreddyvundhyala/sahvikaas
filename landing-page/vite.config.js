@@ -3,6 +3,6 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  base: '/sahvikaas/',
+  base: '/sahvikaas/landing-page/',
   plugins: [react(), tailwindcss()],
 })
